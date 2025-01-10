@@ -4,6 +4,8 @@ import type { Options as UseRequestOptions } from 'ahooks/lib/useRequest/src/typ
 import { Endpoints } from '@/endpoints'
 import { toast } from '@/hooks/use-toast'
 
+import { IS_DEV } from './constants'
+
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
 
 /**
@@ -25,6 +27,8 @@ export async function request(
   options = options ?? {}
   const method = options.method ?? 'GET'
 
+  const storage = IS_DEV ? sessionStorage : localStorage
+
   // Construct the headers
   const headers = new Headers()
   if (method !== 'GET' && method !== 'DELETE') {
@@ -38,7 +42,7 @@ export async function request(
   } else {
     headers.append(
       'Authorization',
-      `Bearer ${localStorage.getItem('accessToken')}`
+      `Bearer ${storage.getItem('accessToken')}`
     )
   }
 

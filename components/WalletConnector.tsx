@@ -16,6 +16,7 @@ import { Account, providers } from '@/lib/wallet'
 import Image from 'next/image'
 import { useBoolean } from 'ahooks'
 import useSignAndSendTx from '@/hooks/use-sign-and-sign-tx'
+import { IS_DEV } from '@/lib/constants'
 
 const WalletConnector: React.FC<{ children?: React.ReactNode }> = (props) => {
   const [wallets, setWallets] = useState<
@@ -64,12 +65,14 @@ const WalletConnector: React.FC<{ children?: React.ReactNode }> = (props) => {
         ).signature
       }
 
+      const storage = IS_DEV ? sessionStorage : localStorage
+
       const { accessToken, isNew } = await signIn({
         address: connector.publicKey.toBase58(),
         timestamp,
         signature: btoa(String.fromCharCode.apply(null, signature)),
       })
-      localStorage.setItem('accessToken', accessToken)
+      storage.setItem('accessToken', accessToken)
 
       // Becareful, don't move the following block under setAccount,
       // otherwise Promise resolve will not be triggered.
@@ -90,7 +93,7 @@ const WalletConnector: React.FC<{ children?: React.ReactNode }> = (props) => {
         },
       }
       setAccount(account)
-      localStorage.setItem('account', JSON.stringify(account))
+      storage.setItem('account', JSON.stringify(account))
 
       toggle()
     } catch (error) {
