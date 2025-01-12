@@ -13,4 +13,14 @@ export interface GameEndpoints {
       }
     }
   }
+  // Sit
+  'v1/sit': {
+    POST: {
+      payload: {
+        gsKey: string
+      }
+      params: {}
+      data: {}
+    }
+  }
 }
