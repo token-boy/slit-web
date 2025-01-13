@@ -1,24 +1,45 @@
 export interface GameEndpoints {
-  // Sign In
-  'v1/play': {
+  // Enter
+  'v1/game/:boardId/enter': {
+    POST: {
+      payload: {}
+      params: {
+        boardId: string
+      }
+      data: {}
+    }
+  }
+  // Play
+  'v1/game/:boardId/play': {
     POST: {
       payload: {
-        boardId: string
         chips: number
       }
-      params: {}
+      params: {
+        boardId: string
+      }
       data: {
-        gsKey: string
+        seatKey: string
         tx: string
       }
     }
   }
   // Sit
-  'v1/sit': {
+  'v1/game/:boardId/sit': {
     POST: {
       payload: {
-        gsKey: string
+        seatKey: string
       }
+      params: {
+        boardId: string
+      }
+      data: {}
+    }
+  }
+  // Ping
+  'v1/game/ping': {
+    GET: {
+      payload: {}
       params: {}
       data: {}
     }

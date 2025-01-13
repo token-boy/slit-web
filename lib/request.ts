@@ -53,6 +53,7 @@ export async function request(
       body: JSON.stringify(options.payload),
       mode: 'cors',
       cache: 'no-cache',
+      credentials: 'include'
     })
 
     const result = await response.json()

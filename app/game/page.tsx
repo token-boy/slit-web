@@ -15,6 +15,7 @@ const Game = dynamic(() => import('./Game'), { ssr: false })
 
 function App() {
   const params = useSearchParams()
+  const boardId = params.get('id')
 
   const { loading: tradeLoading, signAndSendTx } = useSignAndSendTx()
 
@@ -30,27 +31,55 @@ function App() {
     }
   )
 
-  const { loading: sitLoading, runAsync: sit } = useEndpoint('v1/sit', {
-    method: 'POST',
+  const { runAsync: ping } = useEndpoint('v1/game/ping', {
+    method: 'GET',
   })
 
-  const { loading: joinLoading, runAsync: join } = useEndpoint('v1/play', {
+  useEndpoint('v1/game/:boardId/enter', {
     method: 'POST',
+    manual: false,
+    ready: !!boardId,
+    params: { boardId: boardId! },
+    async onSuccess() {
+      const sessionId = new URLSearchParams(document.cookie).get('sessionId')
+      const ms = await consume(
+        `states_${boardId}`,
+        sessionId!.split(':').pop()!
+      )
+      setInterval(ping, 15000)
+      for await (const m of ms) {
+        console.log(m.string())
+      }
+    },
   })
 
-  const consume = async (gsKey: string) => {
+  const { loading: joinLoading, runAsync: join } = useEndpoint(
+    'v1/game/:boardId/play',
+    {
+      method: 'POST',
+    }
+  )
+
+  const { loading: sitLoading, runAsync: sit } = useEndpoint(
+    'v1/game/:boardId/sit',
+    {
+      method: 'POST',
+    }
+  )
+
+  const consume = async (stream: string, name: string) => {
     const nc = await wsconnect({
       servers: 'wss://nats.mxsyx.site',
       authenticator: jwtAuthenticator(
-        'eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiJHWEdZRFBNWVNLNUpWNTdNNERRMk00R0hOS0lMNk8zRzVVREVLV1VZV1ZXQ1JVS01DRTJRIiwiaWF0IjoxNzM2NzAxNDU2LCJpc3MiOiJBQ1AzVjdMN1VMRkpKTkFHNjZTNlIyUkxWTUM3TkVPM1VNQklJSUdBUEFPVTVTV1c3V01CWTJNVSIsIm5hbWUiOiJwbGF5ZXIiLCJzdWIiOiJVQURWVVI3NDZHVEdIQkpTS0dKTFlUSU5aTFZBNEs2Nlg2RUo1VlBJSFNISE5PTUdNSVJSMzU1RSIsIm5hdHMiOnsicHViIjp7ImFsbG93IjpbIiRKUy5BQ0suZ2FtZS5cdTAwM2UiLCIkSlMuQVBJLkNPTlNVTUVSLklORk8uZ2FtZS4qIiwiJEpTLkFQSS5DT05TVU1FUi5NU0cuTkVYVC5nYW1lLioiXX0sInN1YiI6e30sInN1YnMiOi0xLCJkYXRhIjotMSwicGF5bG9hZCI6LTEsInR5cGUiOiJ1c2VyIiwidmVyc2lvbiI6Mn19.qrlilvmXy07me7cWwh4maOXfG31oOpqJS0IWMKjvSHTS7X2dlt-4alAsUtTd4XkoRgyKf8UgcU6_7jmIF73_CA',
+        'eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiI1WEJIQlJJV1RRUEQzS0FHWU9BQkFGSUNNWUNVV01OM0ZWRVdQUkhDNk1HR0xOUFJXNEhRIiwiaWF0IjoxNzM2NzY3NTUwLCJpc3MiOiJBQ1AzVjdMN1VMRkpKTkFHNjZTNlIyUkxWTUM3TkVPM1VNQklJSUdBUEFPVTVTV1c3V01CWTJNVSIsIm5hbWUiOiJwbGF5ZXIiLCJzdWIiOiJVREg3Qk1aN0c1UllXM1VQNDUyS0FYREtQTERWV0hVSEJISkVEUE9UVkhVR0NONUpOSVMzU1hQRiIsIm5hdHMiOnsicHViIjp7ImFsbG93IjpbIiRKUy5BQ0suZ2FtZS5cdTAwM2UiLCIkSlMuQVBJLkNPTlNVTUVSLklORk8uXHUwMDNlIiwiJEpTLkFQSS5DT05TVU1FUi5NU0cuTkVYVC5cdTAwM2UiXX0sInN1YiI6e30sInN1YnMiOi0xLCJkYXRhIjotMSwicGF5bG9hZCI6LTEsInR5cGUiOiJ1c2VyIiwidmVyc2lvbiI6Mn19.zLFPdQavUBq_PqmtmWyzZ7QlzOKbPE95XzIyW-6yBySalEDLe1UOST3wWPP2Ai1E21qdZFQ5LW4bYfFUPqCxBw',
         new TextEncoder().encode(
-          'SUAOIUBYVGC73REGMCECKEURR2YQ3S4RVQSJEOT3XLKF5R73MZKVGZ4D4U'
+          'SUAHZ6WATBMRQIR7K7GCO767NJ6FTILRB526XSWB6JUVW4CDZCR33UTT3Q'
         )
       ),
     })
 
     const js = jetstream(nc)
-    const c = await js.consumers.get('game', gsKey)
+    const c = await js.consumers.get(stream, name)
     return c.consume()
   }
 
@@ -73,13 +102,15 @@ function App() {
         loading={joinLoading || tradeLoading || sitLoading}
         className="fixed top-0 right-0"
         onClick={async () => {
-          const { tx, gsKey } = await join({
-            boardId: params.get('id') as string,
-            chips: 100 * SOL_DECIMALS,
-          })
+          const { tx, seatKey } = await join(
+            {
+              chips: 100 * SOL_DECIMALS,
+            },
+            { boardId: boardId! }
+          )
           await signAndSendTx(tx, account?.provider.mount)
-          const ms = await consume(gsKey)
-          setTimeout(() => sit({ gsKey }), 3000)
+          const ms = await consume('game', seatKey)
+          setTimeout(() => sit({ seatKey }, { boardId: boardId! }), 3000)
           for await (const m of ms) {
             console.log(m.string())
             m.ackAck()
