@@ -9,7 +9,7 @@ import MainGame from './_scenes/MainGame'
 //  https://newdocs.phaser.io/docs/3.70.0/Phaser.Types.Core.GameConfig
 const config: Phaser.Types.Core.GameConfig = {
   type: CANVAS,
-  width: window.innerWidth* window.devicePixelRatio,
+  width: window.innerWidth * window.devicePixelRatio,
   height: window.innerHeight * window.devicePixelRatio,
   parent: 'game-container',
   scene: [Boot, Preloader, MainGame],
@@ -19,7 +19,7 @@ const config: Phaser.Types.Core.GameConfig = {
 }
 
 function startGame(parent: string) {
-  return new PhaserGame({ ...config, parent })
+  return new PhaserGame({ ...config, parent, })
 }
 
 const Game: React.FC = () => {

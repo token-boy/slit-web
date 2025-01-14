@@ -73,13 +73,14 @@ const WalletConnector: React.FC<{ children?: React.ReactNode }> = (props) => {
         signature: btoa(String.fromCharCode.apply(null, signature)),
       })
       storage.setItem('accessToken', accessToken)
+      sessionStorage.setItem('providerMount', wallet.mount)
 
       // Becareful, don't move the following block under setAccount,
       // otherwise Promise resolve will not be triggered.
       if (isNew) {
         try {
           const { tx } = await createPlayer()
-          signAndSendTx(tx, wallet.mount)
+          signAndSendTx(tx)
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (_) {}
       }

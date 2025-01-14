@@ -76,7 +76,7 @@ export async function request(
  * @param path - The path to construct the URL from.
  * @param params - The search parameters and path parameters to include in the constructed URL.
  */
-function getUrl(path: string, params: Dict = {}) {
+export function getUrl(path: string, params: Dict = {}) {
   // URL path parameters
   const names = path.match(/:\w+/g)
   if (names !== null) {

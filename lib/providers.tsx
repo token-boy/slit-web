@@ -28,7 +28,10 @@ export const AccountProvider: ReactFC = (props) => {
       const account = JSON.parse(accountData) as Account
       getConnector(account.provider.mount)
         .then((connector) => {
-          connector.connect().then(() => setAccount(account))
+          connector.connect().then(() => {
+            setAccount(account)
+            sessionStorage.setItem('providerMount', account.provider.mount)
+          })
         })
         .catch(() => {
           storage.removeItem('account')
