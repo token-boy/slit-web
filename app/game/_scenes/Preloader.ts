@@ -31,6 +31,7 @@ class Preloader extends Scene {
   async preload() {
     // this.load.setPath('assets')
     this.load.image('cursorx', 'cursor.webp')
+    this.load.image('my-chips', 'https://files.mxsyx.site/my-chips.webp')
 
     await Promise.all(
       Object.entries(cards).map(([name, data]) => {

@@ -1,4 +1,3 @@
-
 /**
  * Creates a button with a gradient background and rounded corners.
  *
@@ -51,6 +50,7 @@ export function createButton(options: {
 
   const button = scene.add.container(x, y, [image, text])
   button.setSize(width, height)
+  button.setVisible(false)
   button.setInteractive()
   button.on('pointerover', () => {
     image.setScale(0.94)

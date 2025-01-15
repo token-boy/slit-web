@@ -1,18 +1,29 @@
+/**
+ * Design size: 3840x2160
+ */
+
 import { GameObjects, Scene } from 'phaser'
 import { createButton } from '../factory'
-import { SOL_DECIMALS } from '@/lib/constants'
+import { IS_DEV, SOL_DECIMALS } from '@/lib/constants'
 import { signAndSendTx } from '@/hooks/use-sign-and-sign-tx'
 import { jwtAuthenticator, wsconnect } from '@nats-io/nats-core'
 import { ConsumerMessages, jetstream } from '@nats-io/jetstream'
 import { getUrl, request } from '@/lib/request'
+import Player from './Player'
 
 export enum GameCode {
   Error = 0,
   Sync = 1,
 }
 
+interface SeatState {
+  playerId: string
+  hands?: [number, number]
+  chips: number
+}
+
 interface GlobalState {
-  players: { hands?: [number, number]; chips: number }[]
+  seats: SeatState[]
 }
 
 interface Sync {
@@ -22,14 +33,49 @@ interface Sync {
 
 type Message = Sync
 
+interface Seat {
+  /**
+   * The owner address of the player.
+   */
+  owner: string
+
+  /**
+   * The id of the board.
+   */
+  boardId: string
+
+  /**
+   * The id of the player.
+   */
+  playerId: string
+
+  /**
+   * The amount of chips the player has staked.
+   */
+  chips: number
+
+  /**
+   * `unready`: Wait for the transaction of stake chips to be confirmed.
+   * `ready`: The transaction of stake chips has been confirmed.
+   * `playing`: Game is in progress.
+   * `settling`: Game is settling.
+   */
+  status: 'unready' | 'ready' | 'playing' | 'settling'
+}
+
 class MainGame extends Scene {
   background: GameObjects.Image
   deck: GameObjects.Image[] = []
   cursor: GameObjects.Sprite
+  playButton: GameObjects.Container
+  sitButton: GameObjects.Container
+  players: Player[] = []
+
   boardId: string
-  players: GameObjects.Image[] = []
+  seatKey: string
+  seat: Seat
   globalState: GlobalState = {
-    players: [],
+    seats: [],
   }
 
   constructor() {
@@ -90,14 +136,188 @@ class MainGame extends Scene {
    * to keep session alive.
    */
   async enter() {
-    await request(getUrl('v1/game/:boardId/enter', { boardId: this.boardId }))
+    const { seatKey, seat } = await request<{
+      seatKey?: string
+      seat?: Seat
+    }>(getUrl('v1/game/:boardId/enter', { boardId: this.boardId }), {
+      method: 'POST',
+    })
+
     const sessionId = new URLSearchParams(document.cookie).get('sessionId')
     const ms = await this.consume(
-      `states_${this.boardId}`,
+      `state_${this.boardId}`,
       sessionId!.split(':').pop()!
     )
     this.handleMessages(ms, false)
     setInterval(this.ping, 15000)
+
+    if (seatKey && seat) {
+      this.seatKey = seatKey
+      this.seat = seat
+      if (seat.status === 'ready') {
+        this.sitButton.setVisible(true)
+      } else if (seat.status === 'playing') {
+        const ms = await this.consume(`seat_${this.boardId}`, seatKey)
+        this.handleMessages(ms, false)
+      }
+    } else {
+      this.playButton.setVisible(true)
+    }
+  }
+
+  /**
+   * Calculates the positions of players around the game board based on the number of players.
+   *
+   * Determines the layout of player positions depending on the number of players,
+   * adjusting for the current player's seat if applicable. The positions are expressed
+   * as a series of x, y coordinates in the game space, with a gap between players.
+   *
+   * @returns An array of numbers representing the x, y coordinates for players.
+   *          Each player is represented by a pair of coordinates. The array length
+   *          varies depending on the number of players.
+   */
+  calcPlayerPositions(len: number) {
+    const { width, height } = this.size()
+
+    const gap = 200
+
+    if (len === 1) {
+      return [width / 2, gap]
+    } else if (len === 2) {
+      return [gap, height / 2, width - gap, height / 2]
+    } else if (len === 3) {
+      return [gap, height / 2, width / 2, gap, width - gap, height / 2]
+    } else if (len === 4) {
+      return [
+        gap,
+        height / 2,
+        width / 3,
+        gap,
+        width - width / 3,
+        gap,
+        width - gap,
+        height / 2,
+      ]
+    } else if (len === 5) {
+      return [
+        gap,
+        height / 2,
+        width / 4,
+        gap,
+        width / 2,
+        gap,
+        width - width / 4,
+        gap,
+        width - gap,
+        height / 2,
+      ]
+    } else if (len === 6) {
+      return [
+        gap,
+        height / 2,
+        width / 6,
+        height / 4,
+        width / 3,
+        gap,
+        width - width / 3,
+        gap,
+        width - width / 6,
+        height / 4,
+        width - gap,
+        height / 2,
+      ]
+    } else if (len === 7) {
+      return [
+        gap,
+        height / 2,
+        width / 8,
+        height / 4,
+        width / 4,
+        gap,
+        width / 2,
+        gap,
+        width - width / 4,
+        gap,
+        width - width / 8,
+        height / 4,
+        width - gap,
+        height / 2,
+      ]
+    } else if (len === 8) {
+      return [
+        gap,
+        height / 2,
+        width / 8,
+        height / 4,
+        width / 5,
+        gap,
+        width / 2.5,
+        gap,
+        width - width / 2.5,
+        gap,
+        width - width / 5,
+        gap,
+        width - width / 8,
+        height / 4,
+        width - gap,
+        height / 2,
+      ]
+    } else if (len === 9) {
+      return [
+        gap,
+        height / 2,
+        width / 8,
+        height / 4,
+        width / 5,
+        gap,
+        width / 3,
+        gap,
+        width / 2,
+        gap,
+        width - width / 3,
+        gap,
+        width - width / 5,
+        gap,
+        width - width / 8,
+        height / 4,
+        width - gap,
+        height / 2,
+      ]
+    }
+
+    return []
+  }
+
+  async insertPlayer(seatState: SeatState) {
+    const positions = this.calcPlayerPositions(this.players.length + 1)
+
+    // Update existing players position
+    for (let i = 0; i < positions.length - 2; i += 2) {
+      this.players[i / 2].setPosition(positions[i], positions[i + 1])
+    }
+
+    const player = new Player({
+      scene: this,
+      x: positions[positions.length - 2],
+      y: positions[positions.length - 1],
+      id: seatState.playerId,
+      width: 300,
+      height: 100,
+      avatarUrl: `https://files.mxsyx.site/avatar${this.players.length}.jpeg`,
+      nickname: 'Pavel Durov',
+      chips: seatState.chips / SOL_DECIMALS,
+    })
+    this.players.push(player)
+    this.load.start()
+  }
+
+  async handleSync(globalState: GlobalState) {
+    globalState.seats.forEach((seatState) => {
+      const player = this.players.find((p) => p.id === seatState.playerId)
+      if (!player) {
+        this.insertPlayer(seatState)
+      }
+    })
   }
 
   /**
@@ -111,10 +331,12 @@ class MainGame extends Scene {
       const message = m.json<Message>()
       switch (message.code) {
         case GameCode.Sync: {
-          break
+          this.handleSync(message.globalState)
         }
       }
-      console.log(m.string())
+      if (IS_DEV) {
+        console.log(m.string())
+      }
       if (isAck) {
         m.ackAck()
       }
@@ -127,8 +349,6 @@ class MainGame extends Scene {
    * Sends a request to the server to play a game for the current board ID with a specified
    * amount of chips. Signs and sends the transaction received from the server. Then, consumes
    * messages from the 'game' stream using the provided seat key and handles these messages.
-   *
-   * @returns The seat key used to play the game.
    */
   async play() {
     const { tx, seatKey } = await request(
@@ -141,39 +361,39 @@ class MainGame extends Scene {
       }
     )
     await signAndSendTx(tx)
-    const ms = await this.consume('game', seatKey)
+    const ms = await this.consume(`seat_${this.boardId}`, seatKey)
     this.handleMessages(ms, true)
-    return seatKey
+    this.seatKey = seatKey
+    this.playButton.setVisible(false)
+    this.sitButton.setVisible(true)
   }
 
   /**
-   * Sends a request to the server to sit at the given seat key.
+   * Sends a request to sit at the game table.
    *
-   * This will send a request to the server to sit at the given seat key.
-   * @param seatKey - The seat key to sit at.
+   * This function posts a request to the server to take a seat at the game table using
+   * the current seat key.
    */
-  sit(seatKey: string) {
-    return request(getUrl('v1/game/sit'), {
+  async sit() {
+    await request(getUrl('v1/game/sit'), {
       method: 'POST',
-      payload: { seatKey },
+      payload: { seatKey: this.seatKey },
     })
+    this.sitButton.setVisible(false)
   }
 
   deal() {
     // const trigger = this.add.image(400, 600, 'Deck').setInteractive()
-
     // // const cardWidth = 300
     // const cardHeight = 420
     // const gap = 20
     // const deskX = width / 2 - (gap * 51) / 2
     // const deskY = height / 2
-
     // for (let i = 0; i < 52; i++) {
     //   this.deck.push(
     //     this.add.image(deskX + gap * i, deskY, 'Deck').setDepth((52 - i) * 10)
     //   )
     // }
-
     // trigger.on('pointerdown', () => {
     //   const card1 = this.deck.shift()
     //   card1?.setTexture('HeartsAce')
@@ -185,7 +405,6 @@ class MainGame extends Scene {
     //     ease: 'Power2',
     //   })
     //   card1?.setDepth(99)
-
     //   const card2 = this.deck.shift()
     //   card2?.setTexture('ClubsKing')
     //   this.tweens.add({
@@ -217,7 +436,7 @@ class MainGame extends Scene {
     this.input.setDefaultCursor('none')
 
     // Play Button
-    createButton({
+    this.playButton = createButton({
       scene: this,
       x: width / 2,
       y: height - 500,
@@ -225,8 +444,22 @@ class MainGame extends Scene {
       height: 75,
       label: 'Play',
       colors: ['#ad7111', '#d18c26', '#f7a73a'],
-      onClick: this.play,
+      onClick: this.play.bind(this),
     })
+
+    // Sit Button
+    this.sitButton = createButton({
+      scene: this,
+      x: width / 2,
+      y: height - 500,
+      width: 150,
+      height: 75,
+      label: 'Sit',
+      colors: ['#ad7111', '#d18c26', '#f7a73a'],
+      onClick: this.sit.bind(this),
+    })
+
+    this.enter()
   }
 
   update() {

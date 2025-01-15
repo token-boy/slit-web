@@ -17,13 +17,13 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
  * @param options.payload - The payload to send in the request body for non-GET/DELETE requests.
  * @throws Will throw an error if the response status is not OK.
  */
-export async function request(
+export async function request<T = any>(
   url: URL,
   options?: {
     method?: HttpMethod
     payload?: any
   }
-) {
+): Promise<T> {
   options = options ?? {}
   const method = options.method ?? 'GET'
 
