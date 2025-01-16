@@ -70,10 +70,9 @@ class MainGame extends Scene {
   playButton: GameObjects.Container
   sitButton: GameObjects.Container
   players: Player[] = []
-
   boardId: string
   seatKey: string
-  seat: Seat
+  playerId: string
   globalState: GlobalState = {
     seats: [],
   }
@@ -118,16 +117,6 @@ class MainGame extends Scene {
   }
 
   /**
-   * Sends a ping request to the server.
-   *
-   * This is a "noop" endpoint that simply responds with a 200 status code.
-   * It can be used to keep session alive.
-   */
-  async ping() {
-    request(getUrl('v1/game/ping'))
-  }
-
-  /**
    * Enters the game for the given board ID.
    *
    * This will send a request to the server to enter the game, and then
@@ -139,8 +128,8 @@ class MainGame extends Scene {
     const { seatKey, seat } = await request<{
       seatKey?: string
       seat?: Seat
-    }>(getUrl('v1/game/:boardId/enter', { boardId: this.boardId }), {
-      method: 'POST',
+    }>(getUrl(`v1/game/${this.boardId}/enter`), {
+      method: 'GET',
     })
 
     const sessionId = new URLSearchParams(document.cookie).get('sessionId')
@@ -149,11 +138,10 @@ class MainGame extends Scene {
       sessionId!.split(':').pop()!
     )
     this.handleMessages(ms, false)
-    setInterval(this.ping, 15000)
 
     if (seatKey && seat) {
       this.seatKey = seatKey
-      this.seat = seat
+      this.playerId = seat.playerId
       if (seat.status === 'ready') {
         this.sitButton.setVisible(true)
       } else if (seat.status === 'playing') {
@@ -176,7 +164,7 @@ class MainGame extends Scene {
    *          Each player is represented by a pair of coordinates. The array length
    *          varies depending on the number of players.
    */
-  calcPlayerPositions(len: number) {
+  private calcPlayerPositions(len: number) {
     const { width, height } = this.size()
 
     const gap = 200
@@ -288,36 +276,47 @@ class MainGame extends Scene {
     return []
   }
 
-  async insertPlayer(seatState: SeatState) {
-    const positions = this.calcPlayerPositions(this.players.length + 1)
+  private async insertPlayers(seatStates: SeatState[]) {
+    const len = seatStates.length
+    const positions = this.calcPlayerPositions(this.players.length + len)
 
     // Update existing players position
-    for (let i = 0; i < positions.length - 2; i += 2) {
+    for (let i = 0; i < positions.length - 2 * len; i += 2) {
       this.players[i / 2].setPosition(positions[i], positions[i + 1])
     }
 
-    const player = new Player({
-      scene: this,
-      x: positions[positions.length - 2],
-      y: positions[positions.length - 1],
-      id: seatState.playerId,
-      width: 300,
-      height: 100,
-      avatarUrl: `https://files.mxsyx.site/avatar${this.players.length}.jpeg`,
-      nickname: 'Pavel Durov',
-      chips: seatState.chips / SOL_DECIMALS,
-    })
-    this.players.push(player)
-    this.load.start()
+    // Insert new players
+    for (let i = 0; i < len; i++) {
+      const seatState = seatStates[i]
+      const isMine = this.playerId === seatState.playerId
+      const { width, height } = this.size()
+
+      const playerInfo = await request(
+        getUrl(`v1/players/${seatState.playerId}`)
+      )
+      const player = new Player({
+        scene: this,
+        x: isMine ? width / 2 : positions[positions.length - 2 * (len - i)],
+        y: isMine
+          ? height - 200
+          : positions[positions.length - 2 * (len - i) + 1],
+        id: seatState.playerId,
+        width: 300,
+        height: 100,
+        avatarUrl: `https://files.mxsyx.site/${playerInfo.avatarUrl}`,
+        nickname: playerInfo.nickname,
+        chips: seatState.chips / SOL_DECIMALS,
+      })
+      this.players.push(player)
+      this.load.start()
+    }
   }
 
   async handleSync(globalState: GlobalState) {
-    globalState.seats.forEach((seatState) => {
-      const player = this.players.find((p) => p.id === seatState.playerId)
-      if (!player) {
-        this.insertPlayer(seatState)
-      }
-    })
+    const newPlayers = globalState.seats.filter(
+      (seatState) => !this.players.find((p) => p.id === seatState.playerId)
+    )
+    await this.insertPlayers(newPlayers)
   }
 
   /**
@@ -351,7 +350,7 @@ class MainGame extends Scene {
    * messages from the 'game' stream using the provided seat key and handles these messages.
    */
   async play() {
-    const { tx, seatKey } = await request(
+    const { tx, seatKey, playerId } = await request(
       getUrl('v1/game/:boardId/play', { boardId: this.boardId }),
       {
         method: 'POST',
@@ -364,6 +363,7 @@ class MainGame extends Scene {
     const ms = await this.consume(`seat_${this.boardId}`, seatKey)
     this.handleMessages(ms, true)
     this.seatKey = seatKey
+    this.playerId = playerId
     this.playButton.setVisible(false)
     this.sitButton.setVisible(true)
   }
