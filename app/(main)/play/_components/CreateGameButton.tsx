@@ -20,7 +20,7 @@ import { useEndpoint } from '@/lib/request'
 import { useBoolean } from 'ahooks'
 import useSignAndSendTx from '@/hooks/use-sign-and-sign-tx'
 
-export default function CreateGameButton() {
+const CreateGameButton: React.FC<{ onCreated: VoidFunction }> = (props) => {
   const { account } = useContext(AccountContext)
 
   const [open, setOpen] = useBoolean(false)
@@ -35,9 +35,10 @@ export default function CreateGameButton() {
     },
   })
 
-  const { loading: sendTxLoading, signAndSendTx } = useSignAndSendTx(
-    setOpen.setFalse
-  )
+  const { loading: sendTxLoading, signAndSendTx } = useSignAndSendTx(() => {
+    setOpen.setFalse()
+    props.onCreated()
+  })
 
   const { loading: createGameLoading, run: createGame } = useEndpoint(
     'v1/boards',
@@ -94,3 +95,5 @@ export default function CreateGameButton() {
     </Dialog>
   )
 }
+
+export default CreateGameButton

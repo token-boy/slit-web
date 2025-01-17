@@ -7,9 +7,9 @@ import useSignAndSendTx from '@/hooks/use-sign-and-sign-tx'
 import { CHIPS_RATE, SOL_DECIMALS } from '@/lib/constants'
 import { useEndpoint } from '@/lib/request'
 
-import GameList from './_components/GameList'
 import FilterBar from './_components/FilterBar'
 import CreateGameButton from './_components/CreateGameButton'
+import GameCard from './_components/GameCard'
 
 const PlayPage: NextPage = () => {
   const { loading: tradeLoading, signAndSendTx } = useSignAndSendTx()
@@ -23,6 +23,11 @@ const PlayPage: NextPage = () => {
       },
     }
   )
+
+  const { data: boards = [], refresh } = useEndpoint('v1/boards', {
+    method: 'GET',
+    manual: false,
+  })
 
   return (
     <div className="px-5 py-8">
@@ -40,11 +45,28 @@ const PlayPage: NextPage = () => {
           >
             Deposit
           </Button>
-          <CreateGameButton />
+          <CreateGameButton onCreated={refresh} />
         </div>
       </div>
       <FilterBar />
-      <GameList />
+      <div>
+        <div className="flex flex-wrap items-center justify-between mb-8">
+          {boards.map((board) => (
+            <GameCard key={board.id} board={board} />
+          ))}
+        </div>
+        <div className="flex justify-center space-x-2">
+          <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+            上一页
+          </Button>
+          <span className="py-2 px-4 bg-gray-800 text-white rounded">
+            {1} / {1}
+          </span>
+          <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+            下一页
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }

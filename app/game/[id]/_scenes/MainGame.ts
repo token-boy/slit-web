@@ -22,13 +22,13 @@ interface SeatState {
   chips: number
 }
 
-interface GlobalState {
+interface GameState {
   seats: SeatState[]
 }
 
 interface Sync {
   code: GameCode.Sync
-  globalState: GlobalState
+  gameState: GameState
 }
 
 type Message = Sync
@@ -73,13 +73,13 @@ class MainGame extends Scene {
   boardId: string
   seatKey: string
   playerId: string
-  globalState: GlobalState = {
+  gameState: GameState = {
     seats: [],
   }
 
   constructor() {
     super('MainGame')
-    this.boardId = new URLSearchParams(location.search).get('id')!
+    this.boardId = location.pathname.split('/')[2]
   }
 
   size() {
@@ -104,9 +104,9 @@ class MainGame extends Scene {
     const nc = await wsconnect({
       servers: 'wss://nats.mxsyx.site',
       authenticator: jwtAuthenticator(
-        'eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiI1WEJIQlJJV1RRUEQzS0FHWU9BQkFGSUNNWUNVV01OM0ZWRVdQUkhDNk1HR0xOUFJXNEhRIiwiaWF0IjoxNzM2NzY3NTUwLCJpc3MiOiJBQ1AzVjdMN1VMRkpKTkFHNjZTNlIyUkxWTUM3TkVPM1VNQklJSUdBUEFPVTVTV1c3V01CWTJNVSIsIm5hbWUiOiJwbGF5ZXIiLCJzdWIiOiJVREg3Qk1aN0c1UllXM1VQNDUyS0FYREtQTERWV0hVSEJISkVEUE9UVkhVR0NONUpOSVMzU1hQRiIsIm5hdHMiOnsicHViIjp7ImFsbG93IjpbIiRKUy5BQ0suZ2FtZS5cdTAwM2UiLCIkSlMuQVBJLkNPTlNVTUVSLklORk8uXHUwMDNlIiwiJEpTLkFQSS5DT05TVU1FUi5NU0cuTkVYVC5cdTAwM2UiXX0sInN1YiI6e30sInN1YnMiOi0xLCJkYXRhIjotMSwicGF5bG9hZCI6LTEsInR5cGUiOiJ1c2VyIiwidmVyc2lvbiI6Mn19.zLFPdQavUBq_PqmtmWyzZ7QlzOKbPE95XzIyW-6yBySalEDLe1UOST3wWPP2Ai1E21qdZFQ5LW4bYfFUPqCxBw',
+        'eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiJVS0dKVVgyWDZCWUxYRUhEVlZDWkRWS1BNQjZFSzVQVFdXS1BPQ1lPWUNQREw3U1hMSlJRIiwiaWF0IjoxNzM3MDg3ODgwLCJpc3MiOiJBQ1AzVjdMN1VMRkpKTkFHNjZTNlIyUkxWTUM3TkVPM1VNQklJSUdBUEFPVTVTV1c3V01CWTJNVSIsIm5hbWUiOiJwbGF5ZXIiLCJzdWIiOiJVQ0FTT1lMS1hDMlJQUFFKRzdES1lITjNWSkxUVE5LWEZURkFHSkROSU03MkpZN0tZVzdPTURNUSIsIm5hdHMiOnsicHViIjp7ImFsbG93IjpbIiRKUy5BQ0suZ2FtZS5cdTAwM2UiLCIkSlMuQVBJLkNPTlNVTUVSLklORk8uXHUwMDNlIiwiJEpTLkFQSS5DT05TVU1FUi5NU0cuTkVYVC5cdTAwM2UiXX0sInN1YiI6e30sInN1YnMiOi0xLCJkYXRhIjotMSwicGF5bG9hZCI6LTEsInR5cGUiOiJ1c2VyIiwidmVyc2lvbiI6Mn19.vtS1-sxmA8M4OrNh1sVvU1XS3OEX7m0kArIhK2RqdNWcWXx5HPscm3pFxLy8IUtSuEFVtSaiKnkdYcs9O4MaCA',
         new TextEncoder().encode(
-          'SUAHZ6WATBMRQIR7K7GCO767NJ6FTILRB526XSWB6JUVW4CDZCR33UTT3Q'
+          'SUAFKNKRDJZ5AV6QQAMK2NORP2BAFKQDCMF6GQQ2SA6PLAJ6BYKECO4LIQ'
         )
       ),
     })
@@ -125,24 +125,23 @@ class MainGame extends Scene {
    * to keep session alive.
    */
   async enter() {
-    const { seatKey, seat } = await request<{
+    const { sessionId, seatKey, seat } = await request<{
+      sessionId: string
       seatKey?: string
       seat?: Seat
     }>(getUrl(`v1/game/${this.boardId}/enter`), {
       method: 'GET',
     })
 
-    const sessionId = new URLSearchParams(document.cookie).get('sessionId')
-    const ms = await this.consume(
-      `state_${this.boardId}`,
-      sessionId!.split(':').pop()!
-    )
+    const ms = await this.consume(`state_${this.boardId}`, sessionId)
     this.handleMessages(ms, false)
 
     if (seatKey && seat) {
-      this.seatKey = seatKey
       this.playerId = seat.playerId
-      if (seat.status === 'ready') {
+      if (seat.status === 'unready') {
+        this.playButton.setVisible(true)
+      } else if (seat.status === 'ready') {
+        this.seatKey = seatKey
         this.sitButton.setVisible(true)
       } else if (seat.status === 'playing') {
         const ms = await this.consume(`seat_${this.boardId}`, seatKey)
@@ -165,7 +164,7 @@ class MainGame extends Scene {
    *          varies depending on the number of players.
    */
   private calcPlayerPositions(len: number) {
-    const { width, height } = this.size()
+    const { width, height } = this.size.call(this)
 
     const gap = 200
 
@@ -312,8 +311,8 @@ class MainGame extends Scene {
     }
   }
 
-  async handleSync(globalState: GlobalState) {
-    const newPlayers = globalState.seats.filter(
+  async handleSync(gameState: GameState) {
+    const newPlayers = gameState.seats.filter(
       (seatState) => !this.players.find((p) => p.id === seatState.playerId)
     )
     await this.insertPlayers(newPlayers)
@@ -330,7 +329,7 @@ class MainGame extends Scene {
       const message = m.json<Message>()
       switch (message.code) {
         case GameCode.Sync: {
-          this.handleSync(message.globalState)
+          this.handleSync(message.gameState)
         }
       }
       if (IS_DEV) {
@@ -429,7 +428,7 @@ class MainGame extends Scene {
 
     // Custom cursor
     this.cursor = this.add
-      .sprite(100, 100, 'cursorx')
+      .sprite(100, 100, 'cursor')
       .setOrigin(0, 0)
       .setDisplaySize(60, 60)
       .setDepth(999)
