@@ -10,58 +10,7 @@ import { jwtAuthenticator, wsconnect } from '@nats-io/nats-core'
 import { ConsumerMessages, jetstream } from '@nats-io/jetstream'
 import { getUrl, request } from '@/lib/request'
 import Player from './Player'
-
-export enum GameCode {
-  Error = 0,
-  Sync = 1,
-}
-
-interface SeatState {
-  playerId: string
-  hands?: [number, number]
-  chips: number
-}
-
-interface GameState {
-  seats: SeatState[]
-}
-
-interface Sync {
-  code: GameCode.Sync
-  gameState: GameState
-}
-
-type Message = Sync
-
-interface Seat {
-  /**
-   * The owner address of the player.
-   */
-  owner: string
-
-  /**
-   * The id of the board.
-   */
-  boardId: string
-
-  /**
-   * The id of the player.
-   */
-  playerId: string
-
-  /**
-   * The amount of chips the player has staked.
-   */
-  chips: number
-
-  /**
-   * `unready`: Wait for the transaction of stake chips to be confirmed.
-   * `ready`: The transaction of stake chips has been confirmed.
-   * `playing`: Game is in progress.
-   * `settling`: Game is settling.
-   */
-  status: 'unready' | 'ready' | 'playing' | 'settling'
-}
+import { Seat, SeatState, Message, GameCode, Hands } from '@/lib/game'
 
 class MainGame extends Scene {
   background: GameObjects.Image
@@ -73,9 +22,6 @@ class MainGame extends Scene {
   boardId: string
   seatKey: string
   playerId: string
-  gameState: GameState = {
-    seats: [],
-  }
 
   constructor() {
     super('MainGame')
@@ -275,6 +221,14 @@ class MainGame extends Scene {
     return []
   }
 
+  /**
+   * Updates the visual representation of the players based on the provided states.
+   *
+   * Any players in the provided states that are not currently in the scene are added.
+   * The players are positioned based on their index in the provided states array.
+   *
+   * @param states - The states of the players to add to the scene.
+   */
   private async insertPlayers(seatStates: SeatState[]) {
     const len = seatStates.length
     const positions = this.calcPlayerPositions(this.players.length + len)
@@ -304,18 +258,80 @@ class MainGame extends Scene {
         height: 100,
         avatarUrl: `https://files.mxsyx.site/${playerInfo.avatarUrl}`,
         nickname: playerInfo.nickname,
-        chips: seatState.chips / SOL_DECIMALS,
+        chips: seatState.chips,
       })
       this.players.push(player)
       this.load.start()
     }
   }
 
-  async handleSync(gameState: GameState) {
-    const newPlayers = gameState.seats.filter(
-      (seatState) => !this.players.find((p) => p.id === seatState.playerId)
+  /**
+   * Updates the visual representation of the players based on the provided states.
+   *
+   * Any players in the provided states that are not currently in the scene are added.
+   * The players are positioned based on their index in the provided states array.
+   *
+   * @param states - The states of the players to add to the scene.
+   */
+  private async syncSeats(states: SeatState[]) {
+    await this.insertPlayers(
+      states.filter(
+        (states) => !this.players.find((p) => p.id === states.playerId)
+      )
     )
-    await this.insertPlayers(newPlayers)
+  }
+
+  /**
+   * Synchronizes the visual representation of the deck with the current game state.
+   *
+   * Adjusts the number of cards displayed to match the specified count. If there are
+   * more cards than needed, excess cards are removed. If there are fewer cards, new
+   * cards are added and positioned accordingly.
+   *
+   * @param count - The target number of cards to display in the deck.
+   * @param pot - The current pot value, which may be used for display purposes.
+   */
+  private syncDeck(count: number, pot: string) {
+    const diffLen = this.deck.length - count
+    if (diffLen > 0) {
+      // Remove extra cards
+      this.deck.splice(0, diffLen).forEach((card) => card.destroy())
+    } else if (diffLen < 0) {
+      const { width, height } = this.size()
+
+      // Add missing cards
+      // const cardWidth = 300
+      // const cardHeight = 420
+      const gap = 20
+      let deckX = width / 2 + (gap * 51) / 2
+      if (this.deck.length > 0) {
+        deckX = this.deck[this.deck.length - 1].x
+      }
+      const deckY = height / 2
+
+      for (let i = 0; i < Math.abs(diffLen); i++) {
+        this.deck.push(this.add.image(deckX - gap * i, deckY, 'Deck'))
+      }
+    }
+  }
+
+  private syncTurn(playerId?: string, expireAt?: number) {
+    if (!playerId || !expireAt) {
+      return
+    }
+
+    const player = this.players.find((p) => p.id === playerId)
+    if (!player) {
+      return
+    }
+    // player.setTurn(expireAt)
+  }
+
+  private handleTurn(playerId: string, bet: string, hands: Hands) {
+    const player = this.players.find((p) => p.id === playerId)
+    if (player) {
+      player.setBet(bet, hands)
+    }
   }
 
   /**
@@ -329,7 +345,14 @@ class MainGame extends Scene {
       const message = m.json<Message>()
       switch (message.code) {
         case GameCode.Sync: {
-          this.handleSync(message.gameState)
+          this.syncDeck(message.deckCount, message.pot)
+          this.syncSeats(message.seats)
+          this.syncTurn(message.turn, message.turnExpireAt)
+          break
+        }
+        case GameCode.Turn: {
+          this.handleTurn(message.playerId, message.bet, message.hands)
+          break
         }
       }
       if (IS_DEV) {
@@ -354,7 +377,7 @@ class MainGame extends Scene {
       {
         method: 'POST',
         payload: {
-          chips: 100 * SOL_DECIMALS,
+          chips: (100n * SOL_DECIMALS).toString(),
         },
       }
     )
@@ -383,16 +406,6 @@ class MainGame extends Scene {
 
   deal() {
     // const trigger = this.add.image(400, 600, 'Deck').setInteractive()
-    // // const cardWidth = 300
-    // const cardHeight = 420
-    // const gap = 20
-    // const deskX = width / 2 - (gap * 51) / 2
-    // const deskY = height / 2
-    // for (let i = 0; i < 52; i++) {
-    //   this.deck.push(
-    //     this.add.image(deskX + gap * i, deskY, 'Deck').setDepth((52 - i) * 10)
-    //   )
-    // }
     // trigger.on('pointerdown', () => {
     //   const card1 = this.deck.shift()
     //   card1?.setTexture('HeartsAce')

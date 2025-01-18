@@ -1,3 +1,6 @@
+import { SOL_DECIMALS } from '@/lib/constants'
+import { Hands } from '@/lib/game'
+
 interface PlayerOptions {
   scene: Phaser.Scene
   x: number
@@ -7,7 +10,7 @@ interface PlayerOptions {
   id: string
   avatarUrl: string
   nickname: string
-  chips: number
+  chips: string
 }
 
 class Player {
@@ -19,6 +22,9 @@ class Player {
   nickname: Phaser.GameObjects.Text
   myChipsIcon: Phaser.GameObjects.Image
   myChipsText: Phaser.GameObjects.Text
+  bet: Phaser.GameObjects.Text
+  hands: Phaser.GameObjects.Image[]
+  countdown: Phaser.GameObjects.Text
   id: string
 
   constructor(options: PlayerOptions) {
@@ -53,7 +59,7 @@ class Player {
     // Create my chips
     const icon = scene.make.image({ key: 'my-chips' })
     const text = scene.make.text({
-      text: options.chips.toString(),
+      text: (BigInt(options.chips) / SOL_DECIMALS).toString(),
       style: { fontSize: 24 },
     })
     this.myChipsIcon = icon
@@ -126,6 +132,35 @@ class Player {
     this.updateAvatarPosition()
     this.updateNicknamePosition()
     this.updateMyChipsPosition()
+  }
+
+  setBet(bet: string, hands?: Hands) {
+    const { scene, width, height } = this.options
+
+    const betChips = BigInt(bet)
+    if (betChips > 0n) {
+      this.bet = scene.make.text({
+        text: `Bet: ${betChips / SOL_DECIMALS}`,
+        style: { fontSize: 24 },
+      })
+      this.bet.setPosition(width / 2, height / 2)
+      this.bet.setOrigin(0.5, 0.5)
+      this.container.add(this.bet)
+    }
+  }
+
+  setTurn(expireAt: number) {
+    const { scene, width, height } = this.options
+
+    const remain = expireAt - Date.now()
+
+    this.countdown = scene.make.text({
+      text: `${Math.floor(remain / 1000)}`,
+      style: { fontSize: 24 },
+    })
+    this.countdown.setPosition(width / 2, height / 2)
+    this.countdown.setOrigin(0.5, 0.5)
+    // this.container.add(this.countdown)
   }
 }
 
