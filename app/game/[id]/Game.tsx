@@ -13,6 +13,7 @@ const config: Phaser.Types.Core.GameConfig = {
   height: window.innerHeight * window.devicePixelRatio,
   parent: 'game-container',
   scene: [Boot, Preloader, MainGame],
+  // backgroundColor: '#212121',
   scale: {
     mode: Phaser.Scale.FIT,
   },

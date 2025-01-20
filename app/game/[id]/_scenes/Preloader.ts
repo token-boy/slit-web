@@ -32,6 +32,9 @@ class Preloader extends Scene {
     // this.load.setPath('assets')
     this.load.image('cursor', '/cursor.webp')
     this.load.image('my-chips', 'https://files.mxsyx.site/my-chips.webp')
+    this.load.image('countdown', 'https://files.mxsyx.site/countdown.webp')
+    this.load.image('my-bet', 'https://files.mxsyx.site/my-bet.webp?v=1')
+    this.load.image('pot', 'https://files.mxsyx.site/pot.webp')
 
     await Promise.all(
       Object.entries(cards).map(([name, data]) => {

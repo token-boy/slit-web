@@ -19,6 +19,7 @@ import WalletConnector from '@/components/WalletConnector'
 import { useEndpoint } from '@/lib/request'
 import { useBoolean } from 'ahooks'
 import useSignAndSendTx from '@/hooks/use-sign-and-sign-tx'
+import { SOL_DECIMALS } from '@/lib/constants'
 
 const CreateGameButton: React.FC<{ onCreated: VoidFunction }> = (props) => {
   const { account } = useContext(AccountContext)
@@ -85,7 +86,9 @@ const CreateGameButton: React.FC<{ onCreated: VoidFunction }> = (props) => {
             type="submit"
             loading={createGameLoading || sendTxLoading}
             onClick={handleSubmit((data) => {
-              createGame({ minChips: parseInt(data.minChips) })
+              createGame({
+                minChips: (BigInt(data.minChips) * SOL_DECIMALS).toString(),
+              })
             })}
           >
             Create

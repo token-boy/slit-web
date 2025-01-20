@@ -11,6 +11,7 @@ import { ConsumerMessages, jetstream } from '@nats-io/jetstream'
 import { getUrl, request } from '@/lib/request'
 import Player from './Player'
 import { Seat, SeatState, Message, GameCode, Hands } from '@/lib/game'
+import { cardNames } from '../cards'
 
 class MainGame extends Scene {
   background: GameObjects.Image
@@ -18,6 +19,8 @@ class MainGame extends Scene {
   cursor: GameObjects.Sprite
   playButton: GameObjects.Container
   sitButton: GameObjects.Container
+  potIcon: GameObjects.Image
+  potText: GameObjects.Text
   players: Player[] = []
   boardId: string
   seatKey: string
@@ -229,7 +232,7 @@ class MainGame extends Scene {
    *
    * @param states - The states of the players to add to the scene.
    */
-  private async insertPlayers(seatStates: SeatState[]) {
+  private insertPlayers(seatStates: SeatState[]) {
     const len = seatStates.length
     const positions = this.calcPlayerPositions(this.players.length + len)
 
@@ -244,9 +247,6 @@ class MainGame extends Scene {
       const isMine = this.playerId === seatState.playerId
       const { width, height } = this.size()
 
-      const playerInfo = await request(
-        getUrl(`v1/players/${seatState.playerId}`)
-      )
       const player = new Player({
         scene: this,
         x: isMine ? width / 2 : positions[positions.length - 2 * (len - i)],
@@ -256,12 +256,10 @@ class MainGame extends Scene {
         id: seatState.playerId,
         width: 300,
         height: 100,
-        avatarUrl: `https://files.mxsyx.site/${playerInfo.avatarUrl}`,
-        nickname: playerInfo.nickname,
         chips: seatState.chips,
+        hands: seatState.hands,
       })
       this.players.push(player)
-      this.load.start()
     }
   }
 
@@ -274,11 +272,18 @@ class MainGame extends Scene {
    * @param states - The states of the players to add to the scene.
    */
   private async syncSeats(states: SeatState[]) {
-    await this.insertPlayers(
+    this.insertPlayers(
       states.filter(
         (states) => !this.players.find((p) => p.id === states.playerId)
       )
     )
+    for (const state of states) {
+      const player = this.players.find((p) => p.id === state.playerId)
+      if (!player) {
+        continue
+      }
+      player.setState(state)
+    }
   }
 
   /**
@@ -291,23 +296,23 @@ class MainGame extends Scene {
    * @param count - The target number of cards to display in the deck.
    * @param pot - The current pot value, which may be used for display purposes.
    */
-  private syncDeck(count: number, pot: string) {
+  private syncDeck(count: number) {
     const diffLen = this.deck.length - count
     if (diffLen > 0) {
       // Remove extra cards
-      this.deck.splice(0, diffLen).forEach((card) => card.destroy())
+      this.deck.splice(-diffLen).forEach((card) => card.destroy())
     } else if (diffLen < 0) {
       const { width, height } = this.size()
 
       // Add missing cards
       // const cardWidth = 300
-      // const cardHeight = 420
+      const cardHeight = 420
       const gap = 20
       let deckX = width / 2 + (gap * 51) / 2
       if (this.deck.length > 0) {
         deckX = this.deck[this.deck.length - 1].x
       }
-      const deckY = height / 2
+      const deckY = height / 2 - cardHeight
 
       for (let i = 0; i < Math.abs(diffLen); i++) {
         this.deck.push(this.add.image(deckX - gap * i, deckY, 'Deck'))
@@ -315,23 +320,89 @@ class MainGame extends Scene {
     }
   }
 
-  private syncTurn(playerId?: string, expireAt?: number) {
-    if (!playerId || !expireAt) {
-      return
-    }
+  /**
+   * Updates the visual representation of the pot in the game.
+   *
+   * Initializes the pot icon and text display if they do not exist.
+   * Sets the text to the current pot value, adjusting for decimals.
+   *
+   * @param pot - The current pot value as a string, used to update the display.
+   */
 
-    const player = this.players.find((p) => p.id === playerId)
-    if (!player) {
-      return
+  private syncPot(pot: string) {
+    const iconSize = 150
+
+    if (!this.potText) {
+      const { width, height } = this.size()
+      this.potIcon = this.add
+        .image(width / 2 - iconSize / 2, height / 2, 'pot')
+        .setDisplaySize(iconSize, iconSize)
+      this.potText = this.add.text(width / 2 + 36, height / 2, '0', {
+        fontSize: 36,
+        color: '#22AB74',
+      })
+    } else {
+      this.potText.setText((BigInt(pot) / SOL_DECIMALS).toString())
     }
-    // player.setTurn(expireAt)
   }
 
-  private handleTurn(playerId: string, bet: string, hands: Hands) {
-    const player = this.players.find((p) => p.id === playerId)
-    if (player) {
-      player.setBet(bet, hands)
+  /**
+   * Synchronizes the turn indicator for players in the game.
+   *
+   * Sets the countdown timer for the player whose turn it currently is,
+   * based on the provided playerId and the expiration time. Clears the
+   * countdown for all other players.
+   *
+   * @param playerId - The ID of the player whose turn it is. If undefined,
+   *                   no player's countdown will be set.
+   * @param expireAt - The timestamp at which the turn expires. If undefined,
+   *                   the countdown will not be set for the player.
+   */
+
+  private syncTurn(playerId?: string, expireAt?: number) {
+    for (const player of this.players) {
+      if (player.id === playerId) {
+        player.setCountdown(expireAt!)
+      } else {
+        player.clearCountdown()
+      }
     }
+  }
+
+  /**
+   * Updates the visual representation of the current bet in the game.
+   *
+   * For the player with the matching ID, sets the bet display to the provided
+   * value and hands. For all other players, clears the bet display.
+   *
+   * @param playerId - The ID of the player whose bet is to be updated.
+   * @param bet - The new value of the bet, as a string.
+   * @param hands - The new value of the hands, as a pair of strings.
+   */
+  private syncBet(playerId: string, bet: string, hands: Hands) {
+    for (const player of this.players) {
+      if (player.id === playerId) {
+        player.setBet(bet, hands)
+      } else {
+        player.clearBet()
+      }
+    }
+  }
+
+  /**
+   * Updates the visual representation of the open card in the deck.
+   *
+   * Sets the texture of the first card in the deck to match the provided
+   * card index, updating its appearance to reflect the current game state.
+   *
+   * @param card - The index of the card to display, used to update the texture.
+   */
+  private syncOpen(card: number) {
+    const targetCard = this.deck[this.deck.length - 1]
+    if (!targetCard) {
+      return
+    }
+    targetCard.setTexture(cardNames[card])
   }
 
   /**
@@ -345,13 +416,18 @@ class MainGame extends Scene {
       const message = m.json<Message>()
       switch (message.code) {
         case GameCode.Sync: {
-          this.syncDeck(message.deckCount, message.pot)
+          this.syncDeck(message.deckCount)
+          this.syncPot(message.pot)
           this.syncSeats(message.seats)
           this.syncTurn(message.turn, message.turnExpireAt)
           break
         }
-        case GameCode.Turn: {
-          this.handleTurn(message.playerId, message.bet, message.hands)
+        case GameCode.Bet: {
+          this.syncBet(message.playerId, message.bet, message.hands)
+          break
+        }
+        case GameCode.Open: {
+          this.syncOpen(message.card)
           break
         }
       }

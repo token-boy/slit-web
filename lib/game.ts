@@ -1,7 +1,7 @@
 export enum GameCode {
   Error = 0,
   Sync = 1,
-  Turn = 2,
+  Bet = 2,
   Open = 3,
 }
 
@@ -22,14 +22,20 @@ type Sync = {
   pot: string
 }
 
-interface Turn {
-  code: GameCode.Turn
+interface Bet {
+  code: GameCode.Bet
   playerId: string
   bet: string
   hands: Hands
 }
 
-export type Message = Sync | Turn
+interface Open {
+  code: GameCode.Open
+  playerId: string
+  card: number
+}
+
+export type Message = Sync | Bet | Open
 
 export interface Seat {
   /**

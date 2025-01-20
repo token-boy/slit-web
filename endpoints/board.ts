@@ -16,7 +16,7 @@ export interface BoardEndpoints {
     },
     POST: {
       payload: {
-        minChips: number
+        minChips: string
       }
       params: {
         page: number
