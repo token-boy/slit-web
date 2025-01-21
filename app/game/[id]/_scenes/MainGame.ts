@@ -11,10 +11,12 @@ import { ConsumerMessages, jetstream } from '@nats-io/jetstream'
 import { getUrl, request } from '@/lib/request'
 import Player from './Player'
 import { Seat, SeatState, Message, GameCode, Hands } from '@/lib/game'
-import { cardNames } from '../cards'
+import { cardNames, cardSounds } from '../cards'
 
 class MainGame extends Scene {
   background: GameObjects.Image
+  backgroundMusic: Phaser.Sound.WebAudioSound
+  sounds: Phaser.Sound.WebAudioSound
   deck: GameObjects.Image[] = []
   cursor: GameObjects.Sprite
   playButton: GameObjects.Container
@@ -383,6 +385,14 @@ class MainGame extends Scene {
     for (const player of this.players) {
       if (player.id === playerId) {
         player.setBet(bet, hands)
+        const sounds = this.sounds
+        if (BigInt(bet) === 0n) {
+          sounds.play(['不要', '过'].at(Math.floor(Math.random() * 2)))
+        } else {
+          sounds.play(
+            ['这牌不错', '碰碰运气'].at(Math.floor(Math.random() * 2))
+          )
+        }
       } else {
         player.clearBet()
       }
@@ -403,6 +413,9 @@ class MainGame extends Scene {
       return
     }
     targetCard.setTexture(cardNames[card])
+    setTimeout(() => {
+      this.sounds.play(cardSounds.chinese[card], { delay: 1.5 })
+    })
   }
 
   /**
@@ -514,6 +527,16 @@ class MainGame extends Scene {
       .image(0, 0, 'background')
       .setOrigin(0, 0)
       .setDisplaySize(width, height)
+
+    this.backgroundMusic = this.sound.add('background-music', {
+      loop: true,
+      volume: 1,
+    }) as Phaser.Sound.WebAudioSound
+    this.backgroundMusic.play()
+
+    this.sounds = this.sound.addAudioSprite(
+      'sounds-chinese'
+    ) as Phaser.Sound.WebAudioSound
 
     // Custom cursor
     this.cursor = this.add

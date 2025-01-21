@@ -98,7 +98,7 @@ const WalletConnector: React.FC<{ children?: React.ReactNode }> = (props) => {
 
       toggle()
     } catch (error) {
-      console.log(error)
+      console.error(error)
     } finally {
       setActiveWallet(undefined)
     }

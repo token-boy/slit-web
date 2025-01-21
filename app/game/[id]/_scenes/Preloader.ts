@@ -9,13 +9,13 @@ class Preloader extends Scene {
   init() {
     const width = this.sys.game.config.width as number
     const height = this.sys.game.config.height as number
-    
-     this.add
+
+    this.add
       .image(0, 0, 'background')
       .setOrigin(0, 0)
       .setDisplaySize(width, height)
 
-      //  A simple progress bar. This is the outline of the bar.
+    //  A simple progress bar. This is the outline of the bar.
     this.add.rectangle(512, 384, 468, 32).setStrokeStyle(1, 0xffffff)
 
     //  This is the progress bar itself. It will increase in size from the left based on the % of progress.
@@ -35,6 +35,13 @@ class Preloader extends Scene {
     this.load.image('countdown', 'https://files.mxsyx.site/countdown.webp')
     this.load.image('my-bet', 'https://files.mxsyx.site/my-bet.webp?v=1')
     this.load.image('pot', 'https://files.mxsyx.site/pot.webp')
+    this.load.audio(
+      'background-music',
+      'https://files.mxsyx.site/background.mp3'
+    )
+    this.load.audioSprite('sounds-chinese', 'https://files.mxsyx.site/sounds-chinese.json?v=1', [
+      'https://files.mxsyx.site/sounds-chinese.mp3?v=1',
+    ])
 
     await Promise.all(
       Object.entries(cards).map(([name, data]) => {

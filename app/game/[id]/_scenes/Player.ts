@@ -101,7 +101,8 @@ class Player {
   private updateAvatarPosition() {
     const { x, y, width, height } = this.options
     const size = width / 3
-
+    console.log(this, this.avatar);
+    
     this.avatar
       .setPosition(this.isOnLeft ? -width / 2 : width / 2, -height / 2)
       .setOrigin(this.isOnLeft ? 0 : 1, 0)
@@ -143,7 +144,7 @@ class Player {
       .setOrigin(this.isOnLeft ? 0 : 1, 0.5)
   }
 
-  updateMyHands(hands?: Hands) {
+  private updateMyHands(hands?: Hands) {
     const myHands = this.myHands
     if (hands) {
       myHands[0].setTexture(cardNames[hands[0]])
@@ -158,19 +159,19 @@ class Player {
 
   private updateMyHandsPosition() {
     const { width } = this.options
-    const cardWidth = 40
-    const cardHeight = 56
+    const cardWidth = 60
+    const cardHeight = 84
 
     const positionX = -width / 2 + width / 3 / 2 - (cardWidth + 10) / 2
     const originX = this.isOnLeft ? 0 : 1
-    this.myHands[0]
+    this.myHands[1]
       .setPosition(this.isOnLeft ? positionX : -positionX, width / 3 / 2 + 10)
       .setOrigin(originX, 0)
       .setDisplaySize(cardWidth, cardHeight)
-    this.myHands[1]
+    this.myHands[0]
       .setPosition(
-        this.myHands[0].x + (this.isOnLeft ? 10 : -10),
-        this.myHands[0].y
+        this.myHands[1].x + (this.isOnLeft ? 10 : -10),
+        this.myHands[1].y
       )
       .setOrigin(originX, 0)
       .setDisplaySize(cardWidth, cardHeight)
@@ -252,6 +253,7 @@ class Player {
       this.countdownIcon = undefined
       this.countdownText = undefined
       clearInterval(this.timer)
+      this.updateMyHands()
     }
   }
 
