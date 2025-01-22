@@ -53,7 +53,7 @@ class MainGame extends Scene {
    */
   async consume(stream: string, name: string) {
     const nc = await wsconnect({
-      servers: 'wss://nats.mxsyx.site',
+      servers: 'ws://localhost:4223',
       authenticator: jwtAuthenticator(
         'eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiJVS0dKVVgyWDZCWUxYRUhEVlZDWkRWS1BNQjZFSzVQVFdXS1BPQ1lPWUNQREw3U1hMSlJRIiwiaWF0IjoxNzM3MDg3ODgwLCJpc3MiOiJBQ1AzVjdMN1VMRkpKTkFHNjZTNlIyUkxWTUM3TkVPM1VNQklJSUdBUEFPVTVTV1c3V01CWTJNVSIsIm5hbWUiOiJwbGF5ZXIiLCJzdWIiOiJVQ0FTT1lMS1hDMlJQUFFKRzdES1lITjNWSkxUVE5LWEZURkFHSkROSU03MkpZN0tZVzdPTURNUSIsIm5hdHMiOnsicHViIjp7ImFsbG93IjpbIiRKUy5BQ0suZ2FtZS5cdTAwM2UiLCIkSlMuQVBJLkNPTlNVTUVSLklORk8uXHUwMDNlIiwiJEpTLkFQSS5DT05TVU1FUi5NU0cuTkVYVC5cdTAwM2UiXX0sInN1YiI6e30sInN1YnMiOi0xLCJkYXRhIjotMSwicGF5bG9hZCI6LTEsInR5cGUiOiJ1c2VyIiwidmVyc2lvbiI6Mn19.vtS1-sxmA8M4OrNh1sVvU1XS3OEX7m0kArIhK2RqdNWcWXx5HPscm3pFxLy8IUtSuEFVtSaiKnkdYcs9O4MaCA',
         new TextEncoder().encode(
@@ -274,11 +274,21 @@ class MainGame extends Scene {
    * @param states - The states of the players to add to the scene.
    */
   private async syncSeats(states: SeatState[]) {
+    // Remove players that are no longer in the game
+    this.players
+      .filter((p) => !states.find((s) => s.playerId === p.id))
+      .forEach((p) => {
+        p.destroy()
+        this.players.splice(this.players.indexOf(p), 1)
+      })
+
+    // Insert new players
     this.insertPlayers(
       states.filter(
         (states) => !this.players.find((p) => p.id === states.playerId)
       )
     )
+
     for (const state of states) {
       const player = this.players.find((p) => p.id === state.playerId)
       if (!player) {
@@ -460,9 +470,9 @@ class MainGame extends Scene {
    * amount of chips. Signs and sends the transaction received from the server. Then, consumes
    * messages from the 'game' stream using the provided seat key and handles these messages.
    */
-  async play() {
+  async stake() {
     const { tx, seatKey, playerId } = await request(
-      getUrl('v1/game/:boardId/play', { boardId: this.boardId }),
+      getUrl('v1/game/:boardId/stake', { boardId: this.boardId }),
       {
         method: 'POST',
         payload: {
@@ -555,7 +565,7 @@ class MainGame extends Scene {
       height: 75,
       label: 'Play',
       colors: ['#ad7111', '#d18c26', '#f7a73a'],
-      onClick: this.play.bind(this),
+      onClick: this.stake.bind(this),
     })
 
     // Sit Button

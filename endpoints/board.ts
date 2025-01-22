@@ -2,7 +2,7 @@ export interface Board {
   id: string
   address: string
   chips: number
-  minChips: number
+  limit: number
 }
 
 export interface BoardEndpoints {
@@ -16,7 +16,7 @@ export interface BoardEndpoints {
     },
     POST: {
       payload: {
-        minChips: string
+        limit: string
       }
       params: {
         page: number

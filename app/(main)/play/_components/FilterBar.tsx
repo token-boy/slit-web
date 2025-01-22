@@ -12,7 +12,7 @@ export default function FilterBar() {
         <Input id="players" name="players" placeholder="All" className="bg-gray-800 text-white" />
       </div>
       <div className="mr-4">
-        <Label htmlFor="potSize" className="text-white">Min chips</Label>
+        <Label htmlFor="potSize" className="text-white">Limit</Label>
         <Input id="potSize" name="potSize" placeholder="All" className="bg-gray-800 text-white" />
       </div>
       <Button type="submit" className="mt-6 bg-blue-600 hover:bg-blue-700 text-white">Filter</Button>

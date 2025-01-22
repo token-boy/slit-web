@@ -1,3 +1,5 @@
+import { SOL_DECIMALS } from "./constants"
+
 export enum GameCode {
   Error = 0,
   Sync = 1,
@@ -65,4 +67,8 @@ export interface Seat {
    * `settling`: Game is settling.
    */
   status: 'unready' | 'ready' | 'playing' | 'settling'
+}
+
+export function uiAmount(amount: string) {
+  return (BigInt(amount) / SOL_DECIMALS).toString()
 }

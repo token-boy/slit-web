@@ -35,7 +35,7 @@ const GameCard: React.FC<{ board: Board }> = ({ board }) => {
               </div>
               <div className="flex items-center">
                 <Coins className="mr-2" size={16} />
-                <span>{board.minChips} Min chips</span>
+                <span>{board.limit} Limit</span>
               </div>
               <div className="flex items-center col-span-2">
                 <Database className="mr-2" size={16} />

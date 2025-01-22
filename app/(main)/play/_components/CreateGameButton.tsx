@@ -32,7 +32,7 @@ const CreateGameButton: React.FC<{ onCreated: VoidFunction }> = (props) => {
     handleSubmit,
   } = useForm({
     defaultValues: {
-      minChips: '',
+      limit: '',
     },
   })
 
@@ -68,17 +68,17 @@ const CreateGameButton: React.FC<{ onCreated: VoidFunction }> = (props) => {
           <DialogTitle>Create new game</DialogTitle>
         </DialogHeader>
         <div className="py-4">
-          <Label htmlFor="minChips" className="block mb-2">
-            Min chips
+          <Label htmlFor="limit" className="block mb-2">
+            Limit
           </Label>
           <Controller
-            name="minChips"
+            name="limit"
             control={control}
-            rules={{ required: 'Min chips is required' }}
-            render={({ field }) => <Input {...field} placeholder="Min chips" />}
+            rules={{ required: 'Limit is required' }}
+            render={({ field }) => <Input {...field} placeholder="Limit" />}
           />
-          {errors.minChips && (
-            <p className="text-red-500">{errors.minChips.message}</p>
+          {errors.limit && (
+            <p className="text-red-500">{errors.limit.message}</p>
           )}
         </div>
         <DialogFooter>
@@ -87,7 +87,7 @@ const CreateGameButton: React.FC<{ onCreated: VoidFunction }> = (props) => {
             loading={createGameLoading || sendTxLoading}
             onClick={handleSubmit((data) => {
               createGame({
-                minChips: (BigInt(data.minChips) * SOL_DECIMALS).toString(),
+                limit: (BigInt(data.limit) * SOL_DECIMALS).toString(),
               })
             })}
           >

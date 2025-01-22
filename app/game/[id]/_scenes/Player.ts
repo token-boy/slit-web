@@ -18,9 +18,9 @@ class Player {
   options: PlayerOptions
   container: Phaser.GameObjects.Container
   isOnLeft: boolean
-  avatar: Phaser.GameObjects.Image
-  avatarMask: Phaser.GameObjects.Graphics
-  nickname: Phaser.GameObjects.Text
+  avatar?: Phaser.GameObjects.Image
+  avatarMask?: Phaser.GameObjects.Graphics
+  nickname?: Phaser.GameObjects.Text
   myChipsIcon: Phaser.GameObjects.Image
   myChipsText: Phaser.GameObjects.Text
   myHands: Phaser.GameObjects.Image[] = []
@@ -47,6 +47,7 @@ class Player {
       const avatarUrl = `https://files.mxsyx.site/${profile.avatarUrl}`
 
       // Create avatar
+      // TODO placeholder
       scene.load.image(avatarUrl, avatarUrl).once('complete', () => {
         const image = scene.make.image({ key: avatarUrl })
         this.avatarMask = scene.make.graphics()
@@ -99,10 +100,13 @@ class Player {
   }
 
   private updateAvatarPosition() {
+    if (!this.avatar || !this.avatarMask) {
+      return
+    }
+
     const { x, y, width, height } = this.options
     const size = width / 3
-    console.log(this, this.avatar);
-    
+
     this.avatar
       .setPosition(this.isOnLeft ? -width / 2 : width / 2, -height / 2)
       .setOrigin(this.isOnLeft ? 0 : 1, 0)
@@ -118,6 +122,10 @@ class Player {
   }
 
   private updateNicknamePosition() {
+    if (!this.nickname) {
+      return
+    }
+
     const { width, height } = this.options
 
     const positionX = -width / 2 + width / 3 + 10
@@ -164,15 +172,15 @@ class Player {
 
     const positionX = -width / 2 + width / 3 / 2 - (cardWidth + 10) / 2
     const originX = this.isOnLeft ? 0 : 1
-    this.myHands[1]
+    const leftCard = this.myHands[this.isOnLeft ? 0 : 1]
+    const rightCard = this.myHands[this.isOnLeft ? 1 : 0]
+
+    leftCard
       .setPosition(this.isOnLeft ? positionX : -positionX, width / 3 / 2 + 10)
       .setOrigin(originX, 0)
       .setDisplaySize(cardWidth, cardHeight)
-    this.myHands[0]
-      .setPosition(
-        this.myHands[1].x + (this.isOnLeft ? 10 : -10),
-        this.myHands[1].y
-      )
+    rightCard
+      .setPosition(leftCard.x + (this.isOnLeft ? 10 : -10), leftCard.y)
       .setOrigin(originX, 0)
       .setDisplaySize(cardWidth, cardHeight)
   }
@@ -185,6 +193,9 @@ class Player {
     this.updateAvatarPosition()
     this.updateNicknamePosition()
     this.updateMyChipsPosition()
+    this.updateMyHandsPosition()
+    this.updateCountdownPosition()
+    this.updateBetPosition()
   }
 
   setState(state: SeatState) {
@@ -278,6 +289,37 @@ class Player {
       }
       countdownText.setText(`${Math.floor((expireAt - now) / 1000)}`)
     }, 1000)
+  }
+
+  destroy() {
+    if (this.avatar && this.avatarMask) {
+      this.container.remove([this.avatar, this.avatarMask])
+      this.avatar.destroy()
+      this.avatarMask.destroy()
+    }
+    if (this.nickname) {
+      this.container.remove(this.nickname)
+      this.nickname.destroy()
+    }
+    if (this.myHands) {
+      this.container.remove(this.myHands)
+      this.myHands.forEach((card) => card.destroy())
+    }
+    if (this.countdownIcon && this.countdownText) {
+      this.container.remove([this.countdownIcon, this.countdownText])
+      this.countdownIcon.destroy()
+      this.countdownText.destroy()
+      clearInterval(this.timer)
+    }
+    if (this.betIcon && this.betText) {
+      this.container.remove([this.betIcon, this.betText])
+      this.betIcon.destroy()
+      this.betText.destroy()
+    }
+    this.container.remove([this.myChipsIcon, this.myChipsText])
+    this.myChipsIcon.destroy()
+    this.myChipsText.destroy()
+    this.container.destroy()
   }
 }
 
