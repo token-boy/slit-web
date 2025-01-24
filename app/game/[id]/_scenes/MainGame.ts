@@ -3,15 +3,25 @@
  */
 
 import { GameObjects, Scene } from 'phaser'
-import { createButton } from '../factory'
 import { IS_DEV, SOL_DECIMALS } from '@/lib/constants'
 import { signAndSendTx } from '@/hooks/use-sign-and-sign-tx'
 import { jwtAuthenticator, wsconnect } from '@nats-io/nats-core'
 import { ConsumerMessages, jetstream } from '@nats-io/jetstream'
 import { getUrl, request } from '@/lib/request'
-import Player from './Player'
-import { Seat, SeatState, Message, GameCode, Hands } from '@/lib/game'
+import {
+  type Seat,
+  type Message,
+  GameCode,
+  type Hands,
+  uiAmount,
+} from '@/lib/game'
 import { cardNames, cardSounds } from '../cards'
+import { EventBus } from '../EventBus'
+import { toast } from '@/hooks/use-toast'
+
+import Button from './Button'
+import Player from './Player'
+import { sleep } from '@/lib/utils'
 
 class MainGame extends Scene {
   background: GameObjects.Image
@@ -19,14 +29,23 @@ class MainGame extends Scene {
   sounds: Phaser.Sound.WebAudioSound
   deck: GameObjects.Image[] = []
   cursor: GameObjects.Sprite
-  playButton: GameObjects.Container
-  sitButton: GameObjects.Container
+  playButton: Button
   potIcon: GameObjects.Image
   potText: GameObjects.Text
   players: Player[] = []
+  myPlayer?: Player
+  myHands: GameObjects.Image[] = []
+  countdownIcon?: Phaser.GameObjects.Image
+  countdownText?: Phaser.GameObjects.Text
+  timer?: NodeJS.Timeout
+  betButtonGroup: Button[] = []
+  limit: bigint = BigInt(0)
+  pot: bigint = BigInt(0)
   boardId: string
   seatKey: string
   playerId: string
+  hands?: Hands
+  balance: bigint = BigInt(0)
 
   constructor() {
     super('MainGame')
@@ -53,12 +72,10 @@ class MainGame extends Scene {
    */
   async consume(stream: string, name: string) {
     const nc = await wsconnect({
-      servers: 'ws://localhost:4223',
+      servers: process.env.NEXT_PUBLIC_NATS_SERVER,
       authenticator: jwtAuthenticator(
-        'eyJ0eXAiOiJKV1QiLCJhbGciOiJlZDI1NTE5LW5rZXkifQ.eyJqdGkiOiJVS0dKVVgyWDZCWUxYRUhEVlZDWkRWS1BNQjZFSzVQVFdXS1BPQ1lPWUNQREw3U1hMSlJRIiwiaWF0IjoxNzM3MDg3ODgwLCJpc3MiOiJBQ1AzVjdMN1VMRkpKTkFHNjZTNlIyUkxWTUM3TkVPM1VNQklJSUdBUEFPVTVTV1c3V01CWTJNVSIsIm5hbWUiOiJwbGF5ZXIiLCJzdWIiOiJVQ0FTT1lMS1hDMlJQUFFKRzdES1lITjNWSkxUVE5LWEZURkFHSkROSU03MkpZN0tZVzdPTURNUSIsIm5hdHMiOnsicHViIjp7ImFsbG93IjpbIiRKUy5BQ0suZ2FtZS5cdTAwM2UiLCIkSlMuQVBJLkNPTlNVTUVSLklORk8uXHUwMDNlIiwiJEpTLkFQSS5DT05TVU1FUi5NU0cuTkVYVC5cdTAwM2UiXX0sInN1YiI6e30sInN1YnMiOi0xLCJkYXRhIjotMSwicGF5bG9hZCI6LTEsInR5cGUiOiJ1c2VyIiwidmVyc2lvbiI6Mn19.vtS1-sxmA8M4OrNh1sVvU1XS3OEX7m0kArIhK2RqdNWcWXx5HPscm3pFxLy8IUtSuEFVtSaiKnkdYcs9O4MaCA',
-        new TextEncoder().encode(
-          'SUAFKNKRDJZ5AV6QQAMK2NORP2BAFKQDCMF6GQQ2SA6PLAJ6BYKECO4LIQ'
-        )
+        process.env.NEXT_PUBLIC_NATS_JWT_TOKEN!,
+        new TextEncoder().encode(process.env.NEXT_PUBLIC_NATS_NKEY)
       ),
     })
 
@@ -76,6 +93,14 @@ class MainGame extends Scene {
    * to keep session alive.
    */
   async enter() {
+    request<{
+      limit: string
+    }>(getUrl(`v1/boards/${this.boardId}`), {
+      method: 'GET',
+    }).then(({ limit }) => {
+      this.limit = BigInt(limit)
+    })
+
     const { sessionId, seatKey, seat } = await request<{
       sessionId: string
       seatKey?: string
@@ -84,23 +109,15 @@ class MainGame extends Scene {
       method: 'GET',
     })
 
+    if (!seatKey || !seat || seat.chips === '0') {
+      this.playButton.setVisible(true)
+    } else {
+      this.seatKey = seatKey
+      this.playerId = seat.playerId
+    }
+
     const ms = await this.consume(`state_${this.boardId}`, sessionId)
     this.handleMessages(ms, false)
-
-    if (seatKey && seat) {
-      this.playerId = seat.playerId
-      if (seat.status === 'unready') {
-        this.playButton.setVisible(true)
-      } else if (seat.status === 'ready') {
-        this.seatKey = seatKey
-        this.sitButton.setVisible(true)
-      } else if (seat.status === 'playing') {
-        const ms = await this.consume(`seat_${this.boardId}`, seatKey)
-        this.handleMessages(ms, false)
-      }
-    } else {
-      this.playButton.setVisible(true)
-    }
   }
 
   /**
@@ -227,15 +244,17 @@ class MainGame extends Scene {
   }
 
   /**
-   * Updates the visual representation of the players based on the provided states.
+   * Inserts new player instances into the game scene based on the provided seats.
    *
-   * Any players in the provided states that are not currently in the scene are added.
-   * The players are positioned based on their index in the provided states array.
+   * Calculates the positions for the players and updates the position of existing
+   * ones. For new players, creates `Player` instances and adds them to the scene,
+   * excluding the current player's own seat.
    *
-   * @param states - The states of the players to add to the scene.
+   * @param seats - An array of `Seat` objects representing the players to be added
+   *                to the game scene.
    */
-  private insertPlayers(seatStates: SeatState[]) {
-    const len = seatStates.length
+  private insertPlayers(seats: Seat[]) {
+    const len = seats.length
     const positions = this.calcPlayerPositions(this.players.length + len)
 
     // Update existing players position
@@ -245,23 +264,59 @@ class MainGame extends Scene {
 
     // Insert new players
     for (let i = 0; i < len; i++) {
-      const seatState = seatStates[i]
-      const isMine = this.playerId === seatState.playerId
-      const { width, height } = this.size()
-
+      const seat = seats[i]
       const player = new Player({
         scene: this,
-        x: isMine ? width / 2 : positions[positions.length - 2 * (len - i)],
-        y: isMine
-          ? height - 200
-          : positions[positions.length - 2 * (len - i) + 1],
-        id: seatState.playerId,
+        x: positions[positions.length - 2 * (len - i)],
+        y: positions[positions.length - 2 * (len - i) + 1],
+        id: seat.playerId,
         width: 300,
         height: 100,
-        chips: seatState.chips,
-        hands: seatState.hands,
+        chips: seat.chips,
+        hands: seat.hands,
       })
       this.players.push(player)
+    }
+  }
+
+  private async syncMySeat(seat: Seat) {
+    const { width, height } = this.size()
+
+    if (!this.myPlayer) {
+      this.myPlayer = new Player({
+        scene: this,
+        x: width / 2 - 200,
+        y: height - 100,
+        id: seat.playerId,
+        width: 300,
+        height: 100,
+        chips: seat.chips,
+        hands: seat.hands,
+      })
+    } else {
+      this.myPlayer.setState({ ...seat, hands: undefined })
+    }
+
+    // Get current hands
+    this.balance = BigInt(seat.chips)
+    if (seat.hands) {
+      const { hands } = await request<{ hands?: Hands }>(
+        getUrl(`v1/game/${this.boardId}/hands`),
+        {
+          method: 'POST',
+          payload: {
+            seatKey: this.seatKey,
+          },
+        }
+      )
+      if (hands) {
+        hands.sort((a, b) => a - b)
+        this.hands = hands
+        this.setHands(hands)
+      }
+    } else {
+      this.hands = undefined
+      this.setHands(undefined)
     }
   }
 
@@ -273,10 +328,10 @@ class MainGame extends Scene {
    *
    * @param states - The states of the players to add to the scene.
    */
-  private async syncSeats(states: SeatState[]) {
+  private async syncSeats(seats: Seat[]) {
     // Remove players that are no longer in the game
     this.players
-      .filter((p) => !states.find((s) => s.playerId === p.id))
+      .filter((p) => !seats.find((s) => s.playerId === p.id))
       .forEach((p) => {
         p.destroy()
         this.players.splice(this.players.indexOf(p), 1)
@@ -284,17 +339,24 @@ class MainGame extends Scene {
 
     // Insert new players
     this.insertPlayers(
-      states.filter(
-        (states) => !this.players.find((p) => p.id === states.playerId)
+      seats.filter(
+        (seat) =>
+          !this.players.find((p) => p.id === seat.playerId) &&
+          seat.playerId !== this.playerId
       )
     )
 
-    for (const state of states) {
-      const player = this.players.find((p) => p.id === state.playerId)
-      if (!player) {
-        continue
+    // Sync each players's state
+    for (const seat of seats) {
+      if (seat.playerId === this.playerId) {
+        this.syncMySeat(seat)
+      } else {
+        const player = this.players.find((p) => p.id === seat.playerId)
+        if (!player) {
+          continue
+        }
+        player.setState(seat)
       }
-      player.setState(state)
     }
   }
 
@@ -340,7 +402,6 @@ class MainGame extends Scene {
    *
    * @param pot - The current pot value as a string, used to update the display.
    */
-
   private syncPot(pot: string) {
     const iconSize = 150
 
@@ -356,22 +417,133 @@ class MainGame extends Scene {
     } else {
       this.potText.setText((BigInt(pot) / SOL_DECIMALS).toString())
     }
+
+    this.pot = BigInt(pot)
+  }
+
+  private clearCountdown() {
+    if (this.countdownIcon && this.countdownText) {
+      this.countdownIcon.destroy()
+      this.countdownText.destroy()
+      this.countdownIcon = undefined
+      this.countdownText = undefined
+      clearInterval(this.timer)
+    }
+  }
+
+  private async createBetButtons() {
+    const { width, height } = this.size()
+
+    // If turn is my turn, hands may not be available yet
+    let count = 0
+    while (!this.hands && count++ < 5) {
+      await sleep(1000)
+    }
+    if (!this.hands) {
+      return
+    }
+
+    // Display bet buttons
+    const actions: Dict<VoidFunction> = {}
+    const hands = this.hands
+      .map((n) => ((n - 1) % 13) + 1)
+      .sort((a, b) => a - b)
+    const diff = hands[1] - hands[0]
+    console.log(diff, hands);
+    
+    if (diff > 1) {
+      for (let i = 1; i < 4; i++) {
+        actions[`${uiAmount(BigInt(i) * this.limit)} Chips`] = () => {
+          this.bet(BigInt(i) * this.limit)
+        }
+      }
+      actions[`Custom`] = () => {
+        EventBus.emit('open-bet-input')
+      }
+      // A & K
+      if (diff === 12 && this.balance >= this.pot) {
+        actions['All In'] = () => {
+          this.bet(BigInt(this.balance))
+        }
+      }
+    }
+    actions['Fold'] = () => {
+      this.bet(0n)
+    }
+    const lables = Object.keys(actions)
+    const baseX = width / 2 - (150 * lables.length) / 2
+    for (let i = 0; i < lables.length; i++) {
+      this.betButtonGroup.push(
+        new Button({
+          scene: this,
+          x: baseX + 150 * i + 30 * i,
+          y: height - 300,
+          width: 150,
+          height: 75,
+          label: lables[i],
+          colors: ['#ad7111', '#d18c26', '#f7a73a'],
+          onClick: actions[lables[i]].bind(this),
+        })
+      )
+    }
+  }
+
+  private removeBetButtons() {
+    this.betButtonGroup.forEach((b) => b.destroy())
+    this.betButtonGroup = []
+  }
+
+  private setCountdown(expireAt: number) {
+    const { width, height } = this.size()
+
+    const countdownIcon = this.add
+      .image(width / 2 + 300, height - 100, 'countdown')
+      .setDisplaySize(48, 48)
+    const countdownText = this.add
+      .text(
+        countdownIcon.x,
+        countdownIcon.y,
+        `${Math.floor((expireAt - Date.now()) / 1000)}`,
+        {
+          fontSize: 24,
+          color: 'white',
+        }
+      )
+      .setOrigin(0.5)
+    this.countdownIcon = countdownIcon
+    this.countdownText = countdownText
+
+    this.timer = setInterval(() => {
+      const now = Date.now()
+      if (expireAt < now) {
+        this.clearCountdown()
+        return
+      }
+      countdownText.setText(`${Math.floor((expireAt - now) / 1000)}`)
+    }, 1000)
   }
 
   /**
-   * Synchronizes the turn indicator for players in the game.
+   * Updates the visual representation of the current turn in the game.
    *
-   * Sets the countdown timer for the player whose turn it currently is,
-   * based on the provided playerId and the expiration time. Clears the
-   * countdown for all other players.
+   * For the player with the matching ID, sets the countdown display to the
+   * provided value. For all other players, clears the countdown display.
    *
-   * @param playerId - The ID of the player whose turn it is. If undefined,
-   *                   no player's countdown will be set.
-   * @param expireAt - The timestamp at which the turn expires. If undefined,
-   *                   the countdown will not be set for the player.
+   * @param playerId - The ID of the player whose turn is to be updated.
+   * @param expireAt - The new value of the turn, as a number representing the
+   *                   Unix timestamp in milliseconds when the turn expires.
    */
-
   private syncTurn(playerId?: string, expireAt?: number) {
+    if (!playerId) {
+      return
+    }
+    if (this.playerId === playerId) {
+      this.setCountdown(expireAt!)
+      this.createBetButtons()
+    } else if (this.countdownIcon) {
+      this.clearCountdown()
+      this.removeBetButtons()
+    }
     for (const player of this.players) {
       if (player.id === playerId) {
         player.setCountdown(expireAt!)
@@ -429,6 +601,45 @@ class MainGame extends Scene {
   }
 
   /**
+   * Sets the visual representation of the player's hands.
+   *
+   * Calculates the positions for the hands and updates the position of existing
+   * ones. For new hands, creates `Phaser.GameObjects.Image` instances and adds
+   * them to the scene.
+   *
+   * @param hands - The new value of the hands, as a pair of numbers.
+   */
+  private setHands(hands?: Hands) {
+    const myHands = this.myHands
+    if (hands) {
+      hands = hands.sort((a, b) => ((a - 1) % 13) + 1 - ((b - 1) % 13) + 1)
+      myHands[0].setTexture(cardNames[hands[0]])
+      myHands[1].setTexture(cardNames[hands[1]])
+      myHands[0].setVisible(true)
+      myHands[1].setVisible(true)
+    } else {
+      myHands[0].setVisible(false)
+      myHands[1].setVisible(false)
+    }
+  }
+
+  private async bet(chips: bigint) {
+    if (!this.myPlayer || chips > this.balance) {
+      toast({ title: 'Chips not enough' })
+      return
+    }
+
+    this.removeBetButtons()
+    await request(getUrl(`v1/game/${this.boardId}/bet`), {
+      method: 'POST',
+      payload: {
+        seatKey: this.seatKey,
+        bet: chips.toString(),
+      },
+    })
+  }
+
+  /**
    * Handles messages from the specified JetStream consumer.
    *
    * @param ms - The message iterator from the consumer.
@@ -458,7 +669,7 @@ class MainGame extends Scene {
         console.log(m.string())
       }
       if (isAck) {
-        m.ackAck()
+        await m.ackAck()
       }
     }
   }
@@ -481,52 +692,9 @@ class MainGame extends Scene {
       }
     )
     await signAndSendTx(tx)
-    const ms = await this.consume(`seat_${this.boardId}`, seatKey)
-    this.handleMessages(ms, true)
     this.seatKey = seatKey
     this.playerId = playerId
     this.playButton.setVisible(false)
-    this.sitButton.setVisible(true)
-  }
-
-  /**
-   * Sends a request to sit at the game table.
-   *
-   * This function posts a request to the server to take a seat at the game table using
-   * the current seat key.
-   */
-  async sit() {
-    await request(getUrl('v1/game/sit'), {
-      method: 'POST',
-      payload: { seatKey: this.seatKey },
-    })
-    this.sitButton.setVisible(false)
-  }
-
-  deal() {
-    // const trigger = this.add.image(400, 600, 'Deck').setInteractive()
-    // trigger.on('pointerdown', () => {
-    //   const card1 = this.deck.shift()
-    //   card1?.setTexture('HeartsAce')
-    //   this.tweens.add({
-    //     targets: card1,
-    //     x: width / 2 - gap,
-    //     y: height - cardHeight,
-    //     duration: 500,
-    //     ease: 'Power2',
-    //   })
-    //   card1?.setDepth(99)
-    //   const card2 = this.deck.shift()
-    //   card2?.setTexture('ClubsKing')
-    //   this.tweens.add({
-    //     targets: card2,
-    //     x: width / 2,
-    //     y: height - cardHeight,
-    //     duration: 500,
-    //     ease: 'Power2',
-    //   })
-    //   card2?.setDepth(100)
-    // })
   }
 
   create() {
@@ -557,7 +725,7 @@ class MainGame extends Scene {
     this.input.setDefaultCursor('none')
 
     // Play Button
-    this.playButton = createButton({
+    this.playButton = new Button({
       scene: this,
       x: width / 2,
       y: height - 500,
@@ -567,18 +735,16 @@ class MainGame extends Scene {
       colors: ['#ad7111', '#d18c26', '#f7a73a'],
       onClick: this.stake.bind(this),
     })
+    this.playButton.setVisible(false)
 
-    // Sit Button
-    this.sitButton = createButton({
-      scene: this,
-      x: width / 2,
-      y: height - 500,
-      width: 150,
-      height: 75,
-      label: 'Sit',
-      colors: ['#ad7111', '#d18c26', '#f7a73a'],
-      onClick: this.sit.bind(this),
-    })
+    // Create my hands
+    const hand0 = this.add.image(width / 2 + 100, height - 100, cardNames[0])
+    const hand1 = this.add.image(hand0.x + 30, hand0.y, cardNames[0])
+    hand0.setVisible(false)
+    hand1.setVisible(false)
+    this.myHands.push(hand0, hand1)
+
+    EventBus.on('bet-input-submited', this.bet.bind(this))
 
     this.enter()
   }

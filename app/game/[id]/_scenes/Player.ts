@@ -1,5 +1,5 @@
 import { SOL_DECIMALS } from '@/lib/constants'
-import { Hands, SeatState } from '@/lib/game'
+import { Hands, Seat } from '@/lib/game'
 import { getUrl, request } from '@/lib/request'
 import { cardNames } from '../cards'
 
@@ -198,7 +198,7 @@ class Player {
     this.updateBetPosition()
   }
 
-  setState(state: SeatState) {
+  setState(state: Seat) {
     this.myChipsText.setText((BigInt(state.chips) / SOL_DECIMALS).toString())
     this.updateMyHands(state.hands)
     this.clearBet()

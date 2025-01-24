@@ -9,15 +9,9 @@ export enum GameCode {
 
 export type Hands = [number, number]
 
-export interface SeatState {
-  playerId: string
-  hands?: Hands
-  chips: string
-}
-
 type Sync = {
   code: GameCode.Sync
-  seats: SeatState[]
+  seats: Seat[]
   deckCount: number
   turn?: string
   turnExpireAt?: number
@@ -41,16 +35,6 @@ export type Message = Sync | Bet | Open
 
 export interface Seat {
   /**
-   * The owner address of the player.
-   */
-  owner: string
-
-  /**
-   * The id of the board.
-   */
-  boardId: string
-
-  /**
    * The id of the player.
    */
   playerId: string
@@ -61,14 +45,11 @@ export interface Seat {
   chips: string
 
   /**
-   * `unready`: Wait for the transaction of stake chips to be confirmed.
-   * `ready`: The transaction of stake chips has been confirmed.
-   * `playing`: Game is in progress.
-   * `settling`: Game is settling.
+   * The hands of the player.
    */
-  status: 'unready' | 'ready' | 'playing' | 'settling'
+  hands?: Hands
 }
 
-export function uiAmount(amount: string) {
+export function uiAmount(amount: string|bigint) {
   return (BigInt(amount) / SOL_DECIMALS).toString()
 }
