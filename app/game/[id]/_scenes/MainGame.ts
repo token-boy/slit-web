@@ -22,6 +22,7 @@ import { toast } from '@/hooks/use-toast'
 import Button from './Button'
 import Player from './Player'
 import { sleep } from '@/lib/utils'
+import Control from './Control'
 
 class MainGame extends Scene {
   background: GameObjects.Image
@@ -37,13 +38,13 @@ class MainGame extends Scene {
   myHands: GameObjects.Image[] = []
   countdownIcon?: Phaser.GameObjects.Image
   countdownText?: Phaser.GameObjects.Text
-  timer?: NodeJS.Timeout
+  timer?: Phaser.Time.TimerEvent
   betButtonGroup: Button[] = []
   limit: bigint = BigInt(0)
   pot: bigint = BigInt(0)
   boardId: string
-  seatKey: string
-  playerId: string
+  seatKey?: string
+  playerId?: string
   hands?: Hands
   balance: bigint = BigInt(0)
 
@@ -93,27 +94,24 @@ class MainGame extends Scene {
    * to keep session alive.
    */
   async enter() {
-    request<{
-      limit: string
-    }>(getUrl(`v1/boards/${this.boardId}`), {
-      method: 'GET',
-    }).then(({ limit }) => {
-      this.limit = BigInt(limit)
-    })
-
-    const { sessionId, seatKey, seat } = await request<{
+    const { sessionId, seatKey, seat, board } = await request<{
       sessionId: string
       seatKey?: string
       seat?: Seat
+      board: {
+        limit: string
+      }
     }>(getUrl(`v1/game/${this.boardId}/enter`), {
       method: 'GET',
     })
+    this.limit = BigInt(board.limit)
 
-    if (!seatKey || !seat || seat.chips === '0') {
-      this.playButton.setVisible(true)
-    } else {
+    if (seatKey && seat) {
       this.seatKey = seatKey
       this.playerId = seat.playerId
+      this.syncMySeat(seat)
+    } else {
+      this.playButton.setVisible(true)
     }
 
     const ms = await this.consume(`state_${this.boardId}`, sessionId)
@@ -139,103 +137,103 @@ class MainGame extends Scene {
     if (len === 1) {
       return [width / 2, gap]
     } else if (len === 2) {
-      return [gap, height / 2, width - gap, height / 2]
+      return [width - gap, height / 2, gap, height / 2]
     } else if (len === 3) {
-      return [gap, height / 2, width / 2, gap, width - gap, height / 2]
+      return [width - gap, height / 2, width / 2, gap, gap, height / 2]
     } else if (len === 4) {
       return [
-        gap,
+        width - gap,
         height / 2,
-        width / 3,
-        gap,
         width - width / 3,
         gap,
-        width - gap,
+        width / 3,
+        gap,
+        gap,
         height / 2,
       ]
     } else if (len === 5) {
       return [
-        gap,
+        width - gap,
         height / 2,
-        width / 4,
+        width - width / 4,
         gap,
         width / 2,
         gap,
-        width - width / 4,
+        width / 4,
         gap,
-        width - gap,
+        gap,
         height / 2,
       ]
     } else if (len === 6) {
       return [
-        gap,
+        width - gap,
         height / 2,
-        width / 6,
-        height / 4,
-        width / 3,
-        gap,
-        width - width / 3,
-        gap,
         width - width / 6,
         height / 4,
-        width - gap,
+        width - width / 3,
+        gap,
+        width / 3,
+        gap,
+        width / 6,
+        height / 4,
+        gap,
         height / 2,
       ]
     } else if (len === 7) {
       return [
-        gap,
+        width - gap,
         height / 2,
-        width / 8,
+        width - width / 8,
         height / 4,
-        width / 4,
+        width - width / 4,
         gap,
         width / 2,
         gap,
-        width - width / 4,
+        width / 4,
         gap,
-        width - width / 8,
+        width / 8,
         height / 4,
-        width - gap,
+        gap,
         height / 2,
       ]
     } else if (len === 8) {
       return [
-        gap,
+        width - gap,
         height / 2,
-        width / 8,
+        width - width / 8,
         height / 4,
-        width / 5,
-        gap,
-        width / 2.5,
+        width - width / 5,
         gap,
         width - width / 2.5,
         gap,
-        width - width / 5,
+        width / 2.5,
         gap,
-        width - width / 8,
+        width / 5,
+        gap,
+        width / 8,
         height / 4,
-        width - gap,
+        gap,
         height / 2,
       ]
     } else if (len === 9) {
       return [
-        gap,
+        width - gap,
         height / 2,
-        width / 8,
+        width - width / 8,
         height / 4,
-        width / 5,
-        gap,
-        width / 3,
-        gap,
-        width / 2,
+        width - width / 5,
         gap,
         width - width / 3,
         gap,
-        width - width / 5,
+        width / 2,
         gap,
-        width - width / 8,
+        width / 3,
+        gap,
+        width / 5,
+        gap,
+        width / 8,
         height / 4,
-        width - gap,
+        gap,
         height / 2,
       ]
     }
@@ -253,9 +251,12 @@ class MainGame extends Scene {
    * @param seats - An array of `Seat` objects representing the players to be added
    *                to the game scene.
    */
-  private insertPlayers(seats: Seat[]) {
+  private insertPlayers(seats: Seat[], myIndex: number) {
     const len = seats.length
     const positions = this.calcPlayerPositions(this.players.length + len)
+    if (myIndex !== -1) {
+      positions.push(...positions.splice(0, positions.length - myIndex * 2))
+    }
 
     // Update existing players position
     for (let i = 0; i < positions.length - 2 * len; i += 2) {
@@ -338,12 +339,14 @@ class MainGame extends Scene {
       })
 
     // Insert new players
+    const myIndex = seats.findIndex((seat) => seat.playerId === this.playerId)
     this.insertPlayers(
       seats.filter(
         (seat) =>
           !this.players.find((p) => p.id === seat.playerId) &&
           seat.playerId !== this.playerId
-      )
+      ),
+      myIndex
     )
 
     // Sync each players's state
@@ -357,6 +360,12 @@ class MainGame extends Scene {
         }
         player.setState(seat)
       }
+    }
+
+    // Sync my player exit state
+    if (myIndex === -1 && this.myPlayer) {
+      this.setHands()
+      this.playButton.setVisible(true)
     }
   }
 
@@ -427,7 +436,8 @@ class MainGame extends Scene {
       this.countdownText.destroy()
       this.countdownIcon = undefined
       this.countdownText = undefined
-      clearInterval(this.timer)
+      this.timer?.destroy()
+      this.timer = undefined
     }
   }
 
@@ -449,8 +459,7 @@ class MainGame extends Scene {
       .map((n) => ((n - 1) % 13) + 1)
       .sort((a, b) => a - b)
     const diff = hands[1] - hands[0]
-    console.log(diff, hands);
-    
+
     if (diff > 1) {
       for (let i = 1; i < 4; i++) {
         actions[`${uiAmount(BigInt(i) * this.limit)} Chips`] = () => {
@@ -496,6 +505,10 @@ class MainGame extends Scene {
   private setCountdown(expireAt: number) {
     const { width, height } = this.size()
 
+    if (this.timer) {
+      return
+    }
+
     const countdownIcon = this.add
       .image(width / 2 + 300, height - 100, 'countdown')
       .setDisplaySize(48, 48)
@@ -513,14 +526,18 @@ class MainGame extends Scene {
     this.countdownIcon = countdownIcon
     this.countdownText = countdownText
 
-    this.timer = setInterval(() => {
-      const now = Date.now()
-      if (expireAt < now) {
-        this.clearCountdown()
-        return
-      }
-      countdownText.setText(`${Math.floor((expireAt - now) / 1000)}`)
-    }, 1000)
+    this.timer = this.time.addEvent({
+      delay: 1000,
+      loop: true,
+      callback: () => {
+        const now = Date.now()
+        if (expireAt < now) {
+          this.clearCountdown()
+          return
+        }
+        countdownText.setText(`${Math.floor((expireAt - now) / 1000)}`)
+      },
+    })
   }
 
   /**
@@ -540,7 +557,7 @@ class MainGame extends Scene {
     if (this.playerId === playerId) {
       this.setCountdown(expireAt!)
       this.createBetButtons()
-    } else if (this.countdownIcon) {
+    } else if (this.timer || this.betButtonGroup.length) {
       this.clearCountdown()
       this.removeBetButtons()
     }
@@ -636,6 +653,8 @@ class MainGame extends Scene {
         seatKey: this.seatKey,
         bet: chips.toString(),
       },
+    }).catch((e) => {
+      this.createBetButtons()
     })
   }
 
@@ -681,20 +700,48 @@ class MainGame extends Scene {
    * amount of chips. Signs and sends the transaction received from the server. Then, consumes
    * messages from the 'game' stream using the provided seat key and handles these messages.
    */
-  async stake() {
+  async stake(chips: bigint) {
     const { tx, seatKey, playerId } = await request(
       getUrl('v1/game/:boardId/stake', { boardId: this.boardId }),
       {
         method: 'POST',
         payload: {
-          chips: (100n * SOL_DECIMALS).toString(),
+          chips: chips.toString(),
+          seatKey: this.seatKey,
         },
       }
     )
-    await signAndSendTx(tx)
     this.seatKey = seatKey
     this.playerId = playerId
     this.playButton.setVisible(false)
+    await signAndSendTx(tx)
+  }
+
+  /**
+   * Redeems the current player's seat in the game.
+   * 
+   * This method sends a POST request to the server to redeem the player's seat using the `seatKey`.
+   * Upon successful redemption, it signs and sends the transaction, then resets the player's seat and ID.
+   * It also makes the play button visible, clears any countdowns, and removes bet buttons.
+   */
+  private async redeem() {
+    const { tx } = await request(
+      getUrl('v1/game/:boardId/redeem', { boardId: this.boardId }),
+      {
+        method: 'POST',
+        payload: {
+          seatKey: this.seatKey,
+        },
+      }
+    )
+    this.seatKey = undefined
+    this.myPlayer?.destroy()
+    this.myPlayer = undefined
+    this.setHands()
+    this.clearCountdown()
+    this.removeBetButtons()
+    this.playButton.setVisible(true)
+    await signAndSendTx(tx)
   }
 
   create() {
@@ -717,12 +764,12 @@ class MainGame extends Scene {
     ) as Phaser.Sound.WebAudioSound
 
     // Custom cursor
-    this.cursor = this.add
-      .sprite(100, 100, 'cursor')
-      .setOrigin(0, 0)
-      .setDisplaySize(60, 60)
-      .setDepth(999)
-    this.input.setDefaultCursor('none')
+    // this.cursor = this.add
+    //   .sprite(100, 100, 'cursor')
+    //   .setOrigin(0, 0)
+    //   .setDisplaySize(60, 60)
+    //   .setDepth(999)
+    // this.input.setDefaultCursor('none')
 
     // Play Button
     this.playButton = new Button({
@@ -733,7 +780,9 @@ class MainGame extends Scene {
       height: 75,
       label: 'Play',
       colors: ['#ad7111', '#d18c26', '#f7a73a'],
-      onClick: this.stake.bind(this),
+      onClick: () => {
+        EventBus.emit('open-stake-input')
+      },
     })
     this.playButton.setVisible(false)
 
@@ -746,13 +795,39 @@ class MainGame extends Scene {
 
     EventBus.on('bet-input-submited', this.bet.bind(this))
 
+    // Stake
+    new Control({
+      scene: this,
+      x: width - 100,
+      y: height - 100,
+      icon: 'stake',
+      tips: 'Stake',
+      onClick: () => {
+        EventBus.emit('open-stake-input')
+      },
+    })
+    EventBus.on('stake-input-submited', this.stake.bind(this))
+
+    // Exit
+    new Control({
+      scene: this,
+      x: width - 50,
+      y: height - 100,
+      icon: 'exit',
+      tips: 'Exit',
+      onClick: () => {
+        EventBus.emit('open-exit-confirm')
+      },
+    })
+    EventBus.on('exit-confirmed', this.redeem.bind(this))
+
     this.enter()
   }
 
   update() {
     // Update position of custom cursor
-    this.cursor.x = this.input.x
-    this.cursor.y = this.input.y
+    // this.cursor.x = this.input.x
+    // this.cursor.y = this.input.y
   }
 }
 

@@ -39,8 +39,13 @@ function startGame(parent: string) {
 const Game: React.FC = () => {
   const game = useRef<Phaser.Game | null>(null)
 
-  const [open, setOpen] = useState<boolean>(false)
+  const [betInputOpen, setBetInputOpen] = useState<boolean>(false)
   const betInput = useRef<HTMLInputElement>(null)
+
+  const [stakeInputOpen, setStakeInputOpen] = useState<boolean>(false)
+  const stakeInput = useRef<HTMLInputElement>(null)
+
+  const [exitConfirmOpen, setExitConfirmOpen] = useState<boolean>(false)
 
   useLayoutEffect(() => {
     if (game.current === null) {
@@ -48,7 +53,13 @@ const Game: React.FC = () => {
     }
 
     EventBus.on('open-bet-input', () => {
-      setOpen(true)
+      setBetInputOpen(true)
+    })
+    EventBus.on('open-stake-input', () => {
+      setStakeInputOpen(true)
+    })
+    EventBus.on('open-exit-confirm', () => {
+      setExitConfirmOpen(true)
     })
 
     return () => {
@@ -60,11 +71,11 @@ const Game: React.FC = () => {
   }, [])
 
   return (
-    <div id="game-container">
-      <Dialog open={open} onOpenChange={setOpen}>
+    <div id="game-container" className="cursor-pointer">
+      <Dialog open={betInputOpen} onOpenChange={setBetInputOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Select bet</DialogTitle>
+            <DialogTitle>Input bet</DialogTitle>
           </DialogHeader>
           <Input ref={betInput} />
           <DialogFooter>
@@ -79,10 +90,55 @@ const Game: React.FC = () => {
                   'bet-input-submited',
                   BigInt(value) * SOL_DECIMALS
                 )
-                setOpen(false)
+                setBetInputOpen(false)
               }}
             >
               Bet
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={stakeInputOpen} onOpenChange={setStakeInputOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Input chips</DialogTitle>
+          </DialogHeader>
+          <Input ref={stakeInput} />
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                const value = parseInt(stakeInput.current!.value)
+                if (isNaN(value)) {
+                  toast({ title: 'Invalid chips' })
+                  return
+                }
+                EventBus.emit(
+                  'stake-input-submited',
+                  BigInt(value) * SOL_DECIMALS
+                )
+                setStakeInputOpen(false)
+              }}
+            >
+              Continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={exitConfirmOpen} onOpenChange={setExitConfirmOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Warning</DialogTitle>
+          </DialogHeader>
+          <p>Are you sure you want to exit the game?</p>
+          <p>Remaining chips will be returned to your account.</p>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                EventBus.emit('exit-confirmed')
+                setExitConfirmOpen(false)
+              }}
+            >
+              Confirm
             </Button>
           </DialogFooter>
         </DialogContent>

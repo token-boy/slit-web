@@ -2,6 +2,7 @@
 
 import { VersionedTransaction } from '@solana/web3.js'
 import { sleep } from './utils'
+import { CDN_URL } from './constants'
 
 export interface Account {
   address: string
@@ -17,31 +18,31 @@ export const providers = [
     name: 'Phantom',
     mount: 'phantom',
     url: 'https://phantom.app/',
-    logo: '/phantom.png',
+    logo: `${CDN_URL}/phantom.png`,
   },
   {
     name: 'Solflare',
     mount: 'solflare',
     url: 'https://solflare.com/',
-    logo: '/solflare.png',
+    logo: `${CDN_URL}/solflare.png`,
   },
   {
     name: 'Nightly',
     mount: 'nightly',
     url: 'https://nightly.app/',
-    logo: '/nightly.png',
+    logo: `${CDN_URL}/nightly.png`,
   },
   {
     name: 'Backpack',
     mount: 'backpack',
     url: 'https://backpack.app/',
-    logo: '/backpack.png',
+    logo: `${CDN_URL}/backpack.png`,
   },
   {
     name: 'OKX',
     mount: 'okxwallet',
     url: 'https://www.okx.com/web3',
-    logo: '/okxwallet.png',
+    logo: `${CDN_URL}/okxwallet.png`,
   },
 ]
 

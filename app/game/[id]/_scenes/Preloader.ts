@@ -1,5 +1,6 @@
 import { Scene } from 'phaser'
 import cards from '../cards'
+import { CDN_URL } from '@/lib/constants'
 
 class Preloader extends Scene {
   constructor() {
@@ -29,18 +30,17 @@ class Preloader extends Scene {
   }
 
   async preload() {
-    // this.load.setPath('assets')
-    this.load.image('cursor', '/cursor.webp')
-    this.load.image('my-chips', 'https://files.mxsyx.site/my-chips.webp')
-    this.load.image('countdown', 'https://files.mxsyx.site/countdown.webp')
-    this.load.image('my-bet', 'https://files.mxsyx.site/my-bet.webp?v=1')
-    this.load.image('pot', 'https://files.mxsyx.site/pot.webp')
-    this.load.audio(
-      'background-music',
-      'https://files.mxsyx.site/background.mp3'
-    )
-    this.load.audioSprite('sounds-chinese', 'https://files.mxsyx.site/sounds-chinese.json?v=1', [
-      'https://files.mxsyx.site/sounds-chinese.mp3?v=1',
+    this.load.setPath(CDN_URL)
+    this.load.image('cursor', 'cursor.webp?v=2')
+    this.load.image('my-chips', 'my-chips.webp?v=2')
+    this.load.image('countdown', 'countdown.webp?v=2')
+    this.load.image('my-bet', 'my-bet.webp?v=2')
+    this.load.image('pot', 'pot.webp?v=2')
+    this.load.image('stake', 'stake.png?v=2')
+    this.load.image('exit', 'exit.png?v=2')
+    this.load.audio('background-music', 'background.mp3?v=2')
+    this.load.audioSprite('sounds-chinese', 'sounds-chinese.json?v=2', [
+      'sounds-chinese.mp3?v=2',
     ])
 
     await Promise.all(

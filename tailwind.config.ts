@@ -1,4 +1,5 @@
 import type { Config } from 'tailwindcss'
+import { CDN_URL } from './lib/constants'
 
 export default {
   darkMode: ['class'],
@@ -57,7 +58,7 @@ export default {
         sm: 'calc(var(--radius) - 4px)',
       },
       backgroundImage: {
-        hero: "url('/banner.webp')",
+        hero: `url('${CDN_URL}/banner.webp')`,
       },
     },
   },

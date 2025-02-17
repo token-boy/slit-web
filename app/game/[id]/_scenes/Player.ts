@@ -1,4 +1,4 @@
-import { SOL_DECIMALS } from '@/lib/constants'
+import { CDN_URL, SOL_DECIMALS } from '@/lib/constants'
 import { Hands, Seat } from '@/lib/game'
 import { getUrl, request } from '@/lib/request'
 import { cardNames } from '../cards'
@@ -15,20 +15,20 @@ interface PlayerOptions {
 }
 
 class Player {
-  options: PlayerOptions
-  container: Phaser.GameObjects.Container
-  isOnLeft: boolean
-  avatar?: Phaser.GameObjects.Image
-  avatarMask?: Phaser.GameObjects.Graphics
-  nickname?: Phaser.GameObjects.Text
-  myChipsIcon: Phaser.GameObjects.Image
-  myChipsText: Phaser.GameObjects.Text
-  myHands: Phaser.GameObjects.Image[] = []
-  countdownIcon?: Phaser.GameObjects.Image
-  countdownText?: Phaser.GameObjects.Text
-  timer?: NodeJS.Timeout
-  betIcon?: Phaser.GameObjects.Image
-  betText?: Phaser.GameObjects.Text
+  private options: PlayerOptions
+  private container: Phaser.GameObjects.Container
+  private isOnLeft: boolean
+  private avatar?: Phaser.GameObjects.Image
+  private avatarMask?: Phaser.GameObjects.Graphics
+  private nickname?: Phaser.GameObjects.Text
+  private myChipsIcon: Phaser.GameObjects.Image
+  private myChipsText: Phaser.GameObjects.Text
+  private myHands: Phaser.GameObjects.Image[] = []
+  private countdownIcon?: Phaser.GameObjects.Image
+  private countdownText?: Phaser.GameObjects.Text
+  private timer?: Phaser.Time.TimerEvent
+  private betIcon?: Phaser.GameObjects.Image
+  private betText?: Phaser.GameObjects.Text
   id: string
 
   constructor(options: PlayerOptions) {
@@ -44,7 +44,7 @@ class Player {
 
     // Load player profile
     request(getUrl(`v1/players/${options.id}`)).then((profile) => {
-      const avatarUrl = `https://files.mxsyx.site/${profile.avatarUrl}`
+      const avatarUrl = `${CDN_URL}/${profile.avatarUrl}`
 
       // Create avatar
       // TODO placeholder
@@ -152,19 +152,6 @@ class Player {
       .setOrigin(this.isOnLeft ? 0 : 1, 0.5)
   }
 
-  private updateMyHands(hands?: Hands) {
-    const myHands = this.myHands
-    if (hands) {
-      myHands[0].setTexture(cardNames[hands[0]])
-      myHands[1].setTexture(cardNames[hands[1]])
-      myHands[0].setVisible(true)
-      myHands[1].setVisible(true)
-    } else {
-      myHands[0].setVisible(false)
-      myHands[1].setVisible(false)
-    }
-  }
-
   private updateMyHandsPosition() {
     const { width } = this.options
     const cardWidth = 60
@@ -185,23 +172,16 @@ class Player {
       .setDisplaySize(cardWidth, cardHeight)
   }
 
-  setPosition(x: number, y: number) {
-    this.options.x = x
-    this.options.y = y
-    this.container.setPosition(x, y)
-    this.updateIsOnLeft()
-    this.updateAvatarPosition()
-    this.updateNicknamePosition()
-    this.updateMyChipsPosition()
-    this.updateMyHandsPosition()
-    this.updateCountdownPosition()
-    this.updateBetPosition()
-  }
-
-  setState(state: Seat) {
-    this.myChipsText.setText((BigInt(state.chips) / SOL_DECIMALS).toString())
-    this.updateMyHands(state.hands)
-    this.clearBet()
+  private updateCountdownPosition() {
+    if (this.countdownIcon && this.countdownText) {
+      const { width } = this.options
+      this.countdownIcon
+        .setPosition(0, width / 3 / 2 + 36)
+        .setDisplaySize(48, 48)
+      this.countdownText
+        .setPosition(this.countdownIcon.x, this.countdownIcon.y)
+        .setOrigin(0.5)
+    }
   }
 
   private updateBetPosition() {
@@ -212,13 +192,60 @@ class Player {
     }
   }
 
-  clearBet() {
-    if (this.betIcon && this.betText) {
-      this.container.remove([this.betIcon, this.betText])
-      this.betIcon.destroy()
-      this.betText.destroy()
-      this.betIcon = undefined
-      this.betText = undefined
+  private setMyHands(hands?: Hands) {
+    const myHands = this.myHands
+    if (hands) {
+      myHands[0].setTexture(cardNames[hands[0]])
+      myHands[1].setTexture(cardNames[hands[1]])
+      myHands[0].setVisible(true)
+      myHands[1].setVisible(true)
+    } else {
+      myHands[0].setVisible(false)
+      myHands[1].setVisible(false)
+    }
+  }
+
+  setCountdown(expireAt: number) {
+    const { scene } = this.options
+
+    if (this.timer) {
+      return
+    }
+
+    const countdownIcon = scene.make.image({ key: 'countdown' })
+    const countdownText = scene.make.text({
+      text: `${Math.floor((expireAt - Date.now()) / 1000)}`,
+      style: { fontSize: 24, color: 'white' },
+    })
+    this.countdownIcon = countdownIcon
+    this.countdownText = countdownText
+    this.updateCountdownPosition()
+    this.container.add([countdownIcon, countdownText])
+
+    this.timer = scene.time.addEvent({
+      delay: 1000,
+      loop: true,
+      callback: () => {
+        const now = Date.now()
+        if (expireAt < now) {
+          this.clearCountdown()
+          return
+        }
+        countdownText.setText(`${Math.floor((expireAt - now) / 1000)}`)
+      },
+    })
+  }
+
+  clearCountdown() {
+    if (this.countdownIcon && this.countdownText) {
+      this.container.remove([this.countdownIcon, this.countdownText])
+      this.countdownIcon.destroy()
+      this.countdownText.destroy()
+      this.countdownIcon = undefined
+      this.countdownText = undefined
+      this.timer?.destroy()
+      this.timer = undefined
+      this.setMyHands()
     }
   }
 
@@ -240,55 +267,37 @@ class Player {
       this.betText = betText
       this.updateBetPosition()
       this.container.add([betIcon, betText])
-      this.updateMyHands(hands)
+      this.setMyHands(hands)
     }
   }
 
-  updateCountdownPosition() {
-    if (this.countdownIcon && this.countdownText) {
-      const { width } = this.options
-      this.countdownIcon
-        .setPosition(0, width / 3 / 2 + 36)
-        .setDisplaySize(48, 48)
-      this.countdownText
-        .setPosition(this.countdownIcon.x, this.countdownIcon.y)
-        .setOrigin(0.5)
+  clearBet() {
+    if (this.betIcon && this.betText) {
+      this.container.remove([this.betIcon, this.betText])
+      this.betIcon.destroy()
+      this.betText.destroy()
+      this.betIcon = undefined
+      this.betText = undefined
     }
   }
 
-  clearCountdown() {
-    if (this.countdownIcon && this.countdownText) {
-      this.container.remove([this.countdownIcon, this.countdownText])
-      this.countdownIcon.destroy()
-      this.countdownText.destroy()
-      this.countdownIcon = undefined
-      this.countdownText = undefined
-      clearInterval(this.timer)
-      this.updateMyHands()
-    }
-  }
-
-  setCountdown(expireAt: number) {
-    const { scene } = this.options
-
-    const countdownIcon = scene.make.image({ key: 'countdown' })
-    const countdownText = scene.make.text({
-      text: `${Math.floor((expireAt - Date.now()) / 1000)}`,
-      style: { fontSize: 24, color: 'white' },
-    })
-    this.countdownIcon = countdownIcon
-    this.countdownText = countdownText
+  setPosition(x: number, y: number) {
+    this.options.x = x
+    this.options.y = y
+    this.container.setPosition(x, y)
+    this.updateIsOnLeft()
+    this.updateAvatarPosition()
+    this.updateNicknamePosition()
+    this.updateMyChipsPosition()
+    this.updateMyHandsPosition()
     this.updateCountdownPosition()
-    this.container.add([countdownIcon, countdownText])
+    this.updateBetPosition()
+  }
 
-    this.timer = setInterval(() => {
-      const now = Date.now()
-      if (expireAt < now) {
-        this.clearCountdown()
-        return
-      }
-      countdownText.setText(`${Math.floor((expireAt - now) / 1000)}`)
-    }, 1000)
+  setState(state: Seat) {
+    this.myChipsText.setText((BigInt(state.chips) / SOL_DECIMALS).toString())
+    this.setMyHands(state.hands)
+    this.clearBet()
   }
 
   destroy() {
@@ -309,7 +318,7 @@ class Player {
       this.container.remove([this.countdownIcon, this.countdownText])
       this.countdownIcon.destroy()
       this.countdownText.destroy()
-      clearInterval(this.timer)
+      this.timer?.destroy()
     }
     if (this.betIcon && this.betText) {
       this.container.remove([this.betIcon, this.betText])
