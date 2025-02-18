@@ -7,20 +7,26 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { AccountContext } from '@/lib/providers'
 import { useEndpoint } from '@/lib/request'
-import { Account, providers } from '@/lib/wallet'
+import {
+  Account,
+  getConnector,
+  getProviders,
+  WalletProvider,
+} from '@/lib/wallet'
 import Image from 'next/image'
 import { useBoolean } from 'ahooks'
 import useSignAndSendTx from '@/hooks/use-sign-and-sign-tx'
 import { IS_DEV } from '@/lib/constants'
+import { isMobileDevice } from '@/lib/utils'
+import { toast } from '@/hooks/use-toast'
 
 const WalletConnector: React.FC<{ children?: React.ReactNode }> = (props) => {
   const [wallets, setWallets] = useState<
-    ((typeof providers)[0] & { isInstalled: boolean })[]
+    (WalletProvider & { isInstalled: boolean })[]
   >([])
 
   const { setAccount } = useContext(AccountContext)
@@ -45,25 +51,16 @@ const WalletConnector: React.FC<{ children?: React.ReactNode }> = (props) => {
       return
     }
 
-    const descriptor = Object.getOwnPropertyDescriptor(window, wallet.mount)
-    if (!descriptor) {
-      return
-    }
-    const connector = descriptor.value.solana ?? descriptor.value
-
     setActiveWallet(wallet.mount)
+    const connector = await getConnector(wallet.mount)
+
     try {
       await connector.connect()
 
-      let signature: number[]
       const timestamp = Date.now().toString()
-      if (wallet.mount == 'nightly') {
-        signature = await connector.signMessage(timestamp)
-      } else {
-        signature = (
-          await connector.signMessage(new TextEncoder().encode(timestamp))
-        ).signature
-      }
+      const { signature } = await connector.signMessage(
+        new TextEncoder().encode(timestamp)
+      )
 
       const storage = IS_DEV ? sessionStorage : localStorage
 
@@ -81,7 +78,7 @@ const WalletConnector: React.FC<{ children?: React.ReactNode }> = (props) => {
         try {
           const { tx } = await createPlayer()
           signAndSendTx(tx)
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (_) {}
       }
 
@@ -105,47 +102,58 @@ const WalletConnector: React.FC<{ children?: React.ReactNode }> = (props) => {
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(open) => {
-        if (open) {
-          setWallets(
-            providers.map((provider) => ({
-              ...provider,
-              isInstalled: window.hasOwnProperty(provider.mount),
-            }))
-          )
-        }
-        toggle()
-      }}
-    >
-      <DialogTrigger asChild>
-        {props.children ?? <Button>Connect</Button>}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Connect wallet</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          {wallets.map((wallet) => (
-            <Button
-              key={wallet.mount}
-              onClick={() => connect(wallet)}
-              loading={activeWallet === wallet.mount}
-            >
-              <Image
-                src={wallet.logo}
-                alt={wallet.name}
-                width={16}
-                height={16}
-              />
-              {wallet.isInstalled ? '' : 'Install '}
-              {wallet.name}
-            </Button>
-          ))}
-        </div>
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog open={open} onOpenChange={toggle}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Connect wallet</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {wallets.map((wallet) => (
+              <Button
+                key={wallet.mount}
+                onClick={() => connect(wallet)}
+                loading={activeWallet === wallet.mount}
+              >
+                <Image
+                  src={wallet.logo}
+                  alt={wallet.name}
+                  width={16}
+                  height={16}
+                />
+                {wallet.isInstalled ? '' : 'Install '}
+                {wallet.name}
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+      {props.children ?? (
+        <Button
+          onClick={() => {
+            if (isMobileDevice()) {
+              const providers = getProviders()
+              if (providers.length) {
+                connect({ ...providers[0], isInstalled: true })
+              } else {
+                toast({ title: 'No wallet found' })
+              }
+            } else {
+              const providers = getProviders()
+              setWallets(
+                providers.map((provider) => ({
+                  ...provider,
+                  isInstalled: window.hasOwnProperty(provider.mount),
+                }))
+              )
+              toggle()
+            }
+          }}
+        >
+          Connect
+        </Button>
+      )}
+    </>
   )
 }
 

@@ -56,6 +56,9 @@ const cards = {
 
 export const cardNames = Object.keys(cards)
 
+export const cardWidth = 300
+export const cardHeight = 420
+
 export const cardSounds = {
   chinese: [
     '',

@@ -2,9 +2,10 @@ import { CDN_URL, SOL_DECIMALS } from '@/lib/constants'
 import { Hands, Seat } from '@/lib/game'
 import { getUrl, request } from '@/lib/request'
 import { cardNames } from '../cards'
+import { drawRoundedCorner } from './Button'
 
 interface PlayerOptions {
-  scene: Phaser.Scene
+  container: Phaser.GameObjects.Container
   x: number
   y: number
   width: number
@@ -16,10 +17,10 @@ interface PlayerOptions {
 
 class Player {
   private options: PlayerOptions
+  private scene: Phaser.Scene
   private container: Phaser.GameObjects.Container
   private isOnLeft: boolean
   private avatar?: Phaser.GameObjects.Image
-  private avatarMask?: Phaser.GameObjects.Graphics
   private nickname?: Phaser.GameObjects.Text
   private myChipsIcon: Phaser.GameObjects.Image
   private myChipsText: Phaser.GameObjects.Text
@@ -34,7 +35,8 @@ class Player {
   constructor(options: PlayerOptions) {
     this.options = options
 
-    const { scene, x, y, width, height } = options
+    const { container: parent, x, y, width, height } = options
+    const scene = (this.scene = parent.scene)
     this.id = options.id
 
     const container = scene.add.container(x, y)
@@ -47,12 +49,21 @@ class Player {
       const avatarUrl = `${CDN_URL}/${profile.avatarUrl}`
 
       // Create avatar
-      // TODO placeholder
       scene.load.image(avatarUrl, avatarUrl).once('complete', () => {
-        const image = scene.make.image({ key: avatarUrl })
-        this.avatarMask = scene.make.graphics()
+        const sourceImage = scene.textures.get(avatarUrl).getSourceImage()
+        const canvas = scene.textures.createCanvas(
+          crypto.randomUUID(),
+          sourceImage.width,
+          sourceImage.height
+        )!
+        const ctx = canvas.getContext()
+        drawRoundedCorner(canvas, sourceImage.width / 2)
+        ctx.drawImage(sourceImage as HTMLImageElement, 0, 0)
+
+        const image = scene.make.image({ key: canvas })
         this.avatar = image
         this.updateAvatarPosition()
+
         container.add(image)
       })
       scene.load.start()
@@ -88,37 +99,29 @@ class Player {
     container.add([hand0, hand1])
 
     this.container = container
+    parent.add(container)
   }
 
   /**
    * Make object on the right side of the screen appear correctly.
    */
   private updateIsOnLeft() {
-    const { scene, x, width } = this.options
-    const canvasWidth = scene.game.config.width as number
+    const { x, width } = this.options
+    const canvasWidth = this.scene.game.config.width as number
     this.isOnLeft = x < canvasWidth / 2 + width
   }
 
   private updateAvatarPosition() {
-    if (!this.avatar || !this.avatarMask) {
+    if (!this.avatar) {
       return
     }
 
-    const { x, y, width, height } = this.options
+    const { width, height } = this.options
     const size = width / 3
-
     this.avatar
       .setPosition(this.isOnLeft ? -width / 2 : width / 2, -height / 2)
       .setOrigin(this.isOnLeft ? 0 : 1, 0)
       .setDisplaySize(size, size)
-    this.avatarMask.fillRoundedRect(
-      this.isOnLeft ? x - width / 2 : x + width / 2 - size,
-      y - height / 2,
-      size,
-      size,
-      50
-    )
-    this.avatar.setMask(this.avatarMask.createGeometryMask())
   }
 
   private updateNicknamePosition() {
@@ -206,7 +209,7 @@ class Player {
   }
 
   setCountdown(expireAt: number) {
-    const { scene } = this.options
+    const { scene } = this
 
     if (this.timer) {
       return
@@ -250,17 +253,15 @@ class Player {
   }
 
   setBet(bet: string, hands?: Hands) {
-    const { scene } = this.options
-
     this.clearCountdown()
 
     const betChips = BigInt(bet)
     if (betChips > 0n) {
-      const betText = scene.make.text({
+      const betText = this.scene.make.text({
         text: (betChips / SOL_DECIMALS).toString(),
         style: { fontSize: 24 },
       })
-      const betIcon = scene.make.image({
+      const betIcon = this.scene.make.image({
         key: 'my-bet',
       })
       this.betIcon = betIcon
@@ -301,10 +302,9 @@ class Player {
   }
 
   destroy() {
-    if (this.avatar && this.avatarMask) {
-      this.container.remove([this.avatar, this.avatarMask])
+    if (this.avatar) {
+      this.container.remove([this.avatar])
       this.avatar.destroy()
-      this.avatarMask.destroy()
     }
     if (this.nickname) {
       this.container.remove(this.nickname)

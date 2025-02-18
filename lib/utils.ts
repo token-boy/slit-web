@@ -8,3 +8,7 @@ export function cn(...inputs: ClassValue[]) {
 export function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))  
 }
+
+export function isMobileDevice() {
+  return window.innerWidth < 768
+}

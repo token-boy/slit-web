@@ -1,8 +1,8 @@
 'use client'
 
 import { VersionedTransaction } from '@solana/web3.js'
-import { sleep } from './utils'
-import { CDN_URL } from './constants'
+import { isMobileDevice, sleep } from './utils'
+import { CDN_URL, IS_DEV } from './constants'
 
 export interface Account {
   address: string
@@ -13,7 +13,7 @@ export interface Account {
   }
 }
 
-export const providers = [
+const providers = [
   {
     name: 'Phantom',
     mount: 'phantom',
@@ -27,12 +27,6 @@ export const providers = [
     logo: `${CDN_URL}/solflare.png`,
   },
   {
-    name: 'Nightly',
-    mount: 'nightly',
-    url: 'https://nightly.app/',
-    logo: `${CDN_URL}/nightly.png`,
-  },
-  {
     name: 'Backpack',
     mount: 'backpack',
     url: 'https://backpack.app/',
@@ -44,14 +38,47 @@ export const providers = [
     url: 'https://www.okx.com/web3',
     logo: `${CDN_URL}/okxwallet.png`,
   },
+  ...(IS_DEV
+    ? [
+        {
+          name: 'Nightly',
+          mount: 'nightly',
+          url: 'https://nightly.app/',
+          logo: `${CDN_URL}/nightly.png`,
+        },
+      ]
+    : []),
 ]
+
+export type WalletProvider = (typeof providers)[0]
+
+export function getProviders() {
+  if (isMobileDevice()) {
+    return providers.filter((provider) => {
+      return window.hasOwnProperty(provider.mount)
+    })
+  }
+  return providers
+}
 
 export async function getConnector(mount: string) {
   let count = 10
   while (count--) {
     const descriptor = Object.getOwnPropertyDescriptor(window, mount)
     if (descriptor) {
-      return descriptor.value.solana ?? descriptor.value
+      const connector = descriptor.value.solana ?? descriptor.value
+      if (mount === 'nightly') {
+        const originalSignMessage = connector.signMessage.bind(connector)
+        connector.signMessage = async (message: Uint8Array) => {
+          return {
+            signature: await originalSignMessage(
+              new TextDecoder().decode(message)
+            ),
+          }
+        }
+        return connector
+      }
+      return connector
     }
     await sleep(300)
   }

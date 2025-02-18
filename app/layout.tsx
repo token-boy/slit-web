@@ -1,7 +1,8 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 
 import { AccountProvider } from '@/lib/providers'
 import { Toaster } from '@/components/ui/toaster'
+import DevTools from '@/components/DevTools'
 
 import './globals.css'
 
@@ -35,6 +36,10 @@ export const metadata: Metadata = {
   ],
 }
 
+export const viewport: Viewport = {
+  userScalable: false,
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -45,6 +50,7 @@ export default function RootLayout({
       <body>
         <AccountProvider>{children}</AccountProvider>
         <Toaster />
+        <DevTools />
       </body>
     </html>
   )

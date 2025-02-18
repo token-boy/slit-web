@@ -15,16 +15,17 @@ import {
   type Hands,
   uiAmount,
 } from '@/lib/game'
-import { cardNames, cardSounds } from '../cards'
+import { cardHeight, cardNames, cardSounds } from '../cards'
 import { EventBus } from '../EventBus'
 import { toast } from '@/hooks/use-toast'
 
 import Button from './Button'
 import Player from './Player'
-import { sleep } from '@/lib/utils'
+import { isMobileDevice, sleep } from '@/lib/utils'
 import Control from './Control'
 
 class MainGame extends Scene {
+  container: GameObjects.Container
   background: GameObjects.Image
   backgroundMusic: Phaser.Sound.WebAudioSound
   sounds: Phaser.Sound.WebAudioSound
@@ -54,10 +55,15 @@ class MainGame extends Scene {
   }
 
   size() {
-    return {
+    const size = {
       width: this.sys.game.config.width as number,
       height: this.sys.game.config.height as number,
+      scale: (this.sys.game.config.width as number) / 3840,
     }
+    if (isMobileDevice()) {
+      ;[size.width, size.height] = [size.height, size.width]
+    }
+    return size
   }
 
   /**
@@ -267,7 +273,7 @@ class MainGame extends Scene {
     for (let i = 0; i < len; i++) {
       const seat = seats[i]
       const player = new Player({
-        scene: this,
+        container: this.container,
         x: positions[positions.length - 2 * (len - i)],
         y: positions[positions.length - 2 * (len - i) + 1],
         id: seat.playerId,
@@ -285,7 +291,7 @@ class MainGame extends Scene {
 
     if (!this.myPlayer) {
       this.myPlayer = new Player({
-        scene: this,
+        container: this.container,
         x: width / 2 - 200,
         y: height - 100,
         id: seat.playerId,
@@ -388,17 +394,21 @@ class MainGame extends Scene {
       const { width, height } = this.size()
 
       // Add missing cards
-      // const cardWidth = 300
-      const cardHeight = 420
       const gap = 20
       let deckX = width / 2 + (gap * 51) / 2
       if (this.deck.length > 0) {
         deckX = this.deck[this.deck.length - 1].x
       }
-      const deckY = height / 2 - cardHeight
+      const deckY = height / 2 - cardHeight * this.size().scale
 
       for (let i = 0; i < Math.abs(diffLen); i++) {
-        this.deck.push(this.add.image(deckX - gap * i, deckY, 'Deck'))
+        const image = this.make.image({
+          x: deckX - gap * i,
+          y: deckY,
+          key: 'Deck',
+        })
+        this.container.add(image)
+        this.deck.push(image)
       }
     }
   }
@@ -416,13 +426,23 @@ class MainGame extends Scene {
 
     if (!this.potText) {
       const { width, height } = this.size()
-      this.potIcon = this.add
-        .image(width / 2 - iconSize / 2, height / 2, 'pot')
+      this.potIcon = this.make
+        .image({
+          x: width / 2 - iconSize / 2,
+          y: height / 2,
+          key: 'pot',
+        })
         .setDisplaySize(iconSize, iconSize)
-      this.potText = this.add.text(width / 2 + 36, height / 2, '0', {
-        fontSize: 36,
-        color: '#22AB74',
+      this.potText = this.make.text({
+        x: width / 2 + 36,
+        y: height / 2,
+        text: '0',
+        style: {
+          fontSize: 36,
+          color: '#22AB74',
+        },
       })
+      this.container.add([this.potIcon, this.potText])
     } else {
       this.potText.setText((BigInt(pot) / SOL_DECIMALS).toString())
     }
@@ -484,7 +504,7 @@ class MainGame extends Scene {
     for (let i = 0; i < lables.length; i++) {
       this.betButtonGroup.push(
         new Button({
-          scene: this,
+          container: this.container,
           x: baseX + 150 * i + 30 * i,
           y: height - 300,
           width: 150,
@@ -509,22 +529,27 @@ class MainGame extends Scene {
       return
     }
 
-    const countdownIcon = this.add
-      .image(width / 2 + 300, height - 100, 'countdown')
+    const countdownIcon = this.make
+      .image({
+        x: width / 2 + 300,
+        y: height - 100,
+        key: 'countdown',
+      })
       .setDisplaySize(48, 48)
-    const countdownText = this.add
-      .text(
-        countdownIcon.x,
-        countdownIcon.y,
-        `${Math.floor((expireAt - Date.now()) / 1000)}`,
-        {
+    const countdownText = this.make
+      .text({
+        x: countdownIcon.x,
+        y: countdownIcon.y,
+        text: `${Math.floor((expireAt - Date.now()) / 1000)}`,
+        style: {
           fontSize: 24,
           color: 'white',
-        }
-      )
+        },
+      })
       .setOrigin(0.5)
     this.countdownIcon = countdownIcon
     this.countdownText = countdownText
+    this.container.add([countdownIcon, countdownText])
 
     this.timer = this.time.addEvent({
       delay: 1000,
@@ -719,7 +744,7 @@ class MainGame extends Scene {
 
   /**
    * Redeems the current player's seat in the game.
-   * 
+   *
    * This method sends a POST request to the server to redeem the player's seat using the `seatKey`.
    * Upon successful redemption, it signs and sends the transaction, then resets the player's seat and ID.
    * It also makes the play button visible, clears any countdowns, and removes bet buttons.
@@ -747,35 +772,57 @@ class MainGame extends Scene {
   create() {
     const { width, height } = this.size()
 
-    // Game background
-    this.background = this.add
-      .image(0, 0, 'background')
-      .setOrigin(0, 0)
+    const container = this.make
+      .container({})
+      .setSize(width, height)
       .setDisplaySize(width, height)
+    if (isMobileDevice()) {
+      container.setPosition(height, 0)
+      container.setRotation(Math.PI / 2)
+    }
+    this.container = container
 
-    this.backgroundMusic = this.sound.add('background-music', {
-      loop: true,
-      volume: 1,
-    }) as Phaser.Sound.WebAudioSound
-    this.backgroundMusic.play()
+    // Game background
+    const background = this.make
+      .image({ x: 0, y: 0, key: 'background' })
+      .setOrigin(0)
+      .setDisplaySize(width, height)
+    container.add(background)
 
+    // Game audio
+    // this.backgroundMusic = this.sound.add('background-music', {
+    //   loop: true,
+    //   volume: 1,
+    // }) as Phaser.Sound.WebAudioSound
+    // this.backgroundMusic.play()
     this.sounds = this.sound.addAudioSprite(
       'sounds-chinese'
     ) as Phaser.Sound.WebAudioSound
 
-    // Custom cursor
-    // this.cursor = this.add
-    //   .sprite(100, 100, 'cursor')
-    //   .setOrigin(0, 0)
-    //   .setDisplaySize(60, 60)
-    //   .setDepth(999)
-    // this.input.setDefaultCursor('none')
+    // Create my hands
+    const hand0 = this.make
+      .image({
+        x: width / 2 + 100,
+        y: height - 100,
+        key: cardNames[0],
+      })
+      .setVisible(false)
+    const hand1 = this.make
+      .image({
+        x: hand0.x + 30,
+        y: hand0.y,
+        key: cardNames[0],
+      })
+      .setVisible(false)
+    this.myHands.push(hand0, hand1)
+    this.container.add([hand0, hand1])
+    EventBus.on('bet-input-submited', this.bet.bind(this))
 
     // Play Button
     this.playButton = new Button({
-      scene: this,
+      container,
       x: width / 2,
-      y: height - 500,
+      y: height - 100,
       width: 150,
       height: 75,
       label: 'Play',
@@ -786,18 +833,9 @@ class MainGame extends Scene {
     })
     this.playButton.setVisible(false)
 
-    // Create my hands
-    const hand0 = this.add.image(width / 2 + 100, height - 100, cardNames[0])
-    const hand1 = this.add.image(hand0.x + 30, hand0.y, cardNames[0])
-    hand0.setVisible(false)
-    hand1.setVisible(false)
-    this.myHands.push(hand0, hand1)
-
-    EventBus.on('bet-input-submited', this.bet.bind(this))
-
     // Stake
     new Control({
-      scene: this,
+      container,
       x: width - 100,
       y: height - 100,
       icon: 'stake',
@@ -810,7 +848,7 @@ class MainGame extends Scene {
 
     // Exit
     new Control({
-      scene: this,
+      container,
       x: width - 50,
       y: height - 100,
       icon: 'exit',
@@ -822,12 +860,6 @@ class MainGame extends Scene {
     EventBus.on('exit-confirmed', this.redeem.bind(this))
 
     this.enter()
-  }
-
-  update() {
-    // Update position of custom cursor
-    // this.cursor.x = this.input.x
-    // this.cursor.y = this.input.y
   }
 }
 

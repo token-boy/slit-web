@@ -26,7 +26,6 @@ const config: Phaser.Types.Core.GameConfig = {
   height: window.innerHeight * window.devicePixelRatio,
   parent: 'game-container',
   scene: [Boot, Preloader, MainGame],
-  // backgroundColor: '#212121',
   scale: {
     mode: Phaser.Scale.FIT,
   },
@@ -71,7 +70,7 @@ const Game: React.FC = () => {
   }, [])
 
   return (
-    <div id="game-container" className="cursor-pointer">
+    <div id="game-container" className="cursor-pointer rotate-container">
       <Dialog open={betInputOpen} onOpenChange={setBetInputOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>

@@ -1,11 +1,28 @@
+export function drawRoundedCorner(
+  canvas: Phaser.Textures.CanvasTexture,
+  radius: number
+) {
+  const ctx = canvas.getContext()
+  const width = canvas.width
+  const height = canvas.height
+
+  ctx.beginPath()
+  ctx.moveTo(radius, 0)
+  ctx.arcTo(width, 0, width, height, radius)
+  ctx.arcTo(width, height, 0, height, radius)
+  ctx.arcTo(0, height, 0, 0, radius)
+  ctx.arcTo(0, 0, width, 0, radius)
+  ctx.closePath()
+  ctx.clip()
+}
+
 class Button {
   container: Phaser.GameObjects.Container
   image: Phaser.GameObjects.Image
-  mask:  Phaser.GameObjects.Graphics
   text: Phaser.GameObjects.Text
 
   constructor(options: {
-    scene: Phaser.Scene
+    container: Phaser.GameObjects.Container
     x: number
     y: number
     width: number
@@ -15,7 +32,8 @@ class Button {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
     onClick: Function
   }) {
-    const { scene, x, y, width, height, colors } = options
+    const { container: parent, x, y, width, height, colors } = options
+    const { scene } = parent
 
     // Create gradient background
     const gradientTexture = scene.textures.createCanvas(
@@ -29,37 +47,40 @@ class Button {
       gradient.addColorStop(index / (colors.length - 1), color)
     })
     ctx.fillStyle = gradient
+    drawRoundedCorner(gradientTexture!, 20)
     ctx.fillRect(0, 0, width, height)
 
-    // Set to rounded corners
-    const image = scene.add.image(0, 0, gradientTexture!)
-    const mask = scene.make.graphics()
-    mask.fillRoundedRect(x - width / 2, y - height / 2, width, height, 20)
-    image.setMask(mask.createGeometryMask())
+    const image = scene.make.image({
+      x: 0,
+      y: 0,
+      key: gradientTexture!,
+    })
 
-    const text = scene.add
-      .text(0, 0, options.label, {
-        fontSize: '24px',
+    const text = scene.make
+      .text({
+        x: 0,
+        y: 0,
+        text: options.label,
+        style: {
+          fontSize: '24px',
+        },
       })
       .setOrigin(0.5)
 
-    const container = scene.add.container(x, y, [image, text])
+    const container = scene.make.container({
+      x,
+      y,
+      children: [image, text],
+    })
+
     container.setSize(width, height)
     container.setInteractive()
     container.on('pointerover', () => {
       image.setScale(0.94)
-      mask.fillRoundedRect(
-        x - width / 2 + width * 0.03,
-        y - height / 2 + height * 0.03,
-        width - width * 0.06,
-        height - height * 0.06,
-        20
-      )
       text.setScale(0.94)
     })
     container.on('pointerout', () => {
       image.setScale(1)
-      mask.fillRoundedRect(x - width / 2, y - height / 2, width, height, 20)
       text.setScale(1)
     })
     container.on('pointerdown', () => {
@@ -67,9 +88,10 @@ class Button {
     })
 
     this.image = image
-    this.mask = mask
     this.text = text
     this.container = container
+
+    parent.add(container)
   }
 
   setVisible(visible: boolean) {
@@ -79,7 +101,6 @@ class Button {
   destroy() {
     this.container.remove([this.image, this.text])
     this.image.destroy()
-    this.mask.destroy()
     this.text.destroy()
     this.container.destroy()
   }

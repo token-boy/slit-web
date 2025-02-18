@@ -31,7 +31,6 @@ class Preloader extends Scene {
 
   async preload() {
     this.load.setPath(CDN_URL)
-    this.load.image('cursor', 'cursor.webp?v=2')
     this.load.image('my-chips', 'my-chips.webp?v=2')
     this.load.image('countdown', 'countdown.webp?v=2')
     this.load.image('my-bet', 'my-bet.webp?v=2')

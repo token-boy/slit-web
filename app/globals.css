@@ -86,3 +86,15 @@ body {
     @apply flex items-center justify-between;
   }
 }
+
+@media screen and (orientation: portrait) {
+  .rotate-container {
+    /* transform: rotate(90deg);
+    transform-origin: top left;
+    width: 100vh;
+    height: 100vw;
+    position: fixed;
+    left: 100%;
+    top: 0px; */
+  }
+}
