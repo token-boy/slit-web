@@ -2,8 +2,9 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Board } from '@/endpoints/board'
+import { uiAmount } from '@/lib/game'
 import { motion } from 'framer-motion'
-import { Users, Eye, Clock, Coins, Database } from 'lucide-react'
+import { Users, Clock, Coins, Database } from 'lucide-react'
 import Link from 'next/link'
 
 const GameCard: React.FC<{ board: Board }> = ({ board }) => {
@@ -23,23 +24,22 @@ const GameCard: React.FC<{ board: Board }> = ({ board }) => {
             <div className="grid grid-cols-2 gap-2">
               <div className="flex items-center">
                 <Users className="mr-2" size={16} />
-                <span>{0} Players</span>
-              </div>
-              <div className="flex items-center">
-                <Eye className="mr-2" size={16} />
-                <span>{1000} Watchers</span>
+                <span>{board.players} Players</span>
               </div>
               <div className="flex items-center">
                 <Clock className="mr-2" size={16} />
-                <span>{600} Minutes</span>
+                <span>
+                  {Math.floor((Date.now() - board.createdAt) / 1000 / 60)}{' '}
+                  Minutes
+                </span>
               </div>
               <div className="flex items-center">
                 <Coins className="mr-2" size={16} />
-                <span>{board.limit} Limit</span>
+                <span>{uiAmount(BigInt(board.limit))} Limit</span>
               </div>
-              <div className="flex items-center col-span-2">
+              <div className="flex items-center">
                 <Database className="mr-2" size={16} />
-                <span>{board.chips} Chips pool</span>
+                <span>{uiAmount(BigInt(board.chips))} Chips pool</span>
               </div>
             </div>
           </CardContent>

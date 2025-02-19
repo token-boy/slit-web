@@ -1,24 +1,27 @@
 class Control {
+  image: Phaser.GameObjects.Image
+
   constructor(options: {
     container: Phaser.GameObjects.Container
     x: number
     y: number
     width?: number
     height?: number
-    tips: string
+    tips?: string
     icon: string
     // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
     onClick: Function
   }) {
-    const { container, x, y, width = 32, height = 32, icon, tips } = options
+    const { container, x, y, width = 64, height = 64, icon, tips } = options
 
     let tipsText: Phaser.GameObjects.Text | null = null
-    const image = container.scene.make
+    this.image = container.scene.make
       .image({ x, y, key: icon })
       .setDisplaySize(width, height)
       .setInteractive()
       .on('pointerover', () => {
-        tipsText = container.scene.make
+        if (tips) {
+          tipsText = container.scene.make
           .text({
             x,
             y: y - 50,
@@ -31,6 +34,7 @@ class Control {
             },
           })
           .setOrigin(0.5)
+        }
       })
       .on('pointerout', () => {
         if (tipsText) {
@@ -41,7 +45,11 @@ class Control {
         options.onClick()
       })
 
-    container.add(image)
+    container.add(this.image)
+  }
+
+  setIcon(key: string) {
+    this.image.setTexture(key)
   }
 }
 

@@ -9,14 +9,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
-import Boot from './_scenes/Boot'
-import Preloader from './_scenes/Preloader'
-import MainGame from './_scenes/MainGame'
+import Boot from './Boot'
+import Preloader from './Preloader'
+import MainGame from './MainGame'
 import { Input } from '@/components/ui/input'
 import { EventBus } from './EventBus'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/hooks/use-toast'
 import { SOL_DECIMALS } from '@/lib/constants'
+import WalletConnector from '@/components/WalletConnector'
 
 //  Find out more information about the Game Config at:
 //  https://newdocs.phaser.io/docs/3.70.0/Phaser.Types.Core.GameConfig
@@ -46,6 +47,8 @@ const Game: React.FC = () => {
 
   const [exitConfirmOpen, setExitConfirmOpen] = useState<boolean>(false)
 
+  const walletConnector = useRef<HTMLDivElement>(null)
+
   useLayoutEffect(() => {
     if (game.current === null) {
       game.current = startGame('game-container')
@@ -60,6 +63,9 @@ const Game: React.FC = () => {
     EventBus.on('open-exit-confirm', () => {
       setExitConfirmOpen(true)
     })
+    EventBus.on('open-wallet-connector', () => {
+      walletConnector.current?.click()
+    })
 
     return () => {
       if (game.current) {
@@ -70,7 +76,7 @@ const Game: React.FC = () => {
   }, [])
 
   return (
-    <div id="game-container" className="cursor-pointer rotate-container">
+    <div id="game-container" className="cursor-pointer">
       <Dialog open={betInputOpen} onOpenChange={setBetInputOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -142,6 +148,9 @@ const Game: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <div className='hidden'>
+      <WalletConnector ref={walletConnector} />
+      </div>
     </div>
   )
 }

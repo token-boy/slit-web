@@ -3,7 +3,7 @@
 import React from 'react'
 
 import { Account, getConnector } from '@/lib/wallet'
-import { IS_DEV } from './constants'
+import { getStorage } from './utils'
 
 export const AccountContext = React.createContext<{
   account?: Account
@@ -22,7 +22,7 @@ export const AccountProvider: ReactFC = (props) => {
   const [account, setAccount] = React.useState<Account>()
 
   React.useEffect(() => {
-    const storage = IS_DEV ? sessionStorage : localStorage
+    const storage = getStorage()
     const accountData = storage.getItem('account')
     if (accountData) {
       const account = JSON.parse(accountData) as Account

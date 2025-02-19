@@ -1,20 +1,4 @@
-export function drawRoundedCorner(
-  canvas: Phaser.Textures.CanvasTexture,
-  radius: number
-) {
-  const ctx = canvas.getContext()
-  const width = canvas.width
-  const height = canvas.height
-
-  ctx.beginPath()
-  ctx.moveTo(radius, 0)
-  ctx.arcTo(width, 0, width, height, radius)
-  ctx.arcTo(width, height, 0, height, radius)
-  ctx.arcTo(0, height, 0, 0, radius)
-  ctx.arcTo(0, 0, width, 0, radius)
-  ctx.closePath()
-  ctx.clip()
-}
+import { drawRoundedCorner } from "./utils"
 
 class Button {
   container: Phaser.GameObjects.Container

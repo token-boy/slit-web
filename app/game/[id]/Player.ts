@@ -1,8 +1,8 @@
 import { CDN_URL, SOL_DECIMALS } from '@/lib/constants'
 import { Hands, Seat } from '@/lib/game'
 import { getUrl, request } from '@/lib/request'
-import { cardNames } from '../cards'
-import { drawRoundedCorner } from './Button'
+import { cardNames } from './cards'
+import { drawRoundedCorner } from './utils'
 
 interface PlayerOptions {
   container: Phaser.GameObjects.Container
@@ -107,7 +107,7 @@ class Player {
    */
   private updateIsOnLeft() {
     const { x, width } = this.options
-    const canvasWidth = this.scene.game.config.width as number
+    const canvasWidth = this.scene.data.get('width') as number
     this.isOnLeft = x < canvasWidth / 2 + width
   }
 

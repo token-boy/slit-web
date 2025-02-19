@@ -1,6 +1,8 @@
 import { Scene } from 'phaser'
-import cards from '../cards'
+import cards from './cards'
 import { CDN_URL } from '@/lib/constants'
+import { getSize } from './utils'
+import { isMobileDevice } from '@/lib/utils'
 
 class Preloader extends Scene {
   constructor() {
@@ -8,23 +10,31 @@ class Preloader extends Scene {
   }
 
   init() {
-    const width = this.sys.game.config.width as number
-    const height = this.sys.game.config.height as number
+    const { width, height } = getSize(this)
 
-    this.add
-      .image(0, 0, 'background')
-      .setOrigin(0, 0)
+   const container = this.make
+      .container({})
+      .setSize(width, height)
       .setDisplaySize(width, height)
+    if (isMobileDevice()) {
+      container.setPosition(height, 0)
+      container.setRotation(Math.PI / 2)
+    }
 
-    //  A simple progress bar. This is the outline of the bar.
-    this.add.rectangle(512, 384, 468, 32).setStrokeStyle(1, 0xffffff)
+    // Game background
+    const background = this.make
+      .image({ x: 0, y: 0, key: 'background' })
+      .setOrigin(0)
+      .setDisplaySize(width, height)
+    container.add(background)
 
-    //  This is the progress bar itself. It will increase in size from the left based on the % of progress.
-    const bar = this.add.rectangle(512 - 230, 384, 4, 28, 0xffffff)
+    // Progress bar
+    const outline= this.add.rectangle(width/2, height/2, 468, 32).setStrokeStyle(1, 0xd18c26)
+    const bar = this.add.rectangle(width/2 - 230, height/2, 4, 28, 0xad7111)
+    container.add([outline, bar])
 
     //  Use the 'progress' event emitted by the LoaderPlugin to update the loading bar
     this.load.on('progress', (progress: number) => {
-      //  Update the progress bar (our bar is 464px wide, so 100% = 464px)
       bar.width = 4 + 460 * progress
     })
   }
@@ -35,12 +45,17 @@ class Preloader extends Scene {
     this.load.image('countdown', 'countdown.webp?v=2')
     this.load.image('my-bet', 'my-bet.webp?v=2')
     this.load.image('pot', 'pot.webp?v=2')
-    this.load.image('stake', 'stake.png?v=2')
-    this.load.image('exit', 'exit.png?v=2')
+    this.load.image('stake', 'stake.png?v=3')
+    this.load.image('exit', 'exit.png?v=3')
+    this.load.image('back', 'back.png?v=3')
+    this.load.image('mute', 'mute.png?v=3')
+    this.load.image('unmute', 'unmute.png?v=3')
+    this.load.image('start', 'start.webp?v=3')
     this.load.audio('background-music', 'background.mp3?v=2')
     this.load.audioSprite('sounds-chinese', 'sounds-chinese.json?v=2', [
       'sounds-chinese.mp3?v=2',
     ])
+    this.load.audio('start', 'start.mp3?v=2')
 
     await Promise.all(
       Object.entries(cards).map(([name, data]) => {

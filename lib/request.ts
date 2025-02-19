@@ -4,7 +4,7 @@ import type { Options as UseRequestOptions } from 'ahooks/lib/useRequest/src/typ
 import { Endpoints } from '@/endpoints'
 import { toast } from '@/hooks/use-toast'
 
-import { IS_DEV } from './constants'
+import { getStorage } from './utils'
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
 
@@ -27,7 +27,7 @@ export async function request<T = any>(
   options = options ?? {}
   const method = options.method ?? 'GET'
 
-  const storage = IS_DEV ? sessionStorage : localStorage
+  const storage = getStorage()
 
   // Construct the headers
   const headers = new Headers()
@@ -40,10 +40,7 @@ export async function request<T = any>(
   if (typeof window === 'undefined') {
     headers.append('Origin', 'http://client.docker')
   } else {
-    headers.append(
-      'Authorization',
-      `Bearer ${storage.getItem('accessToken')}`
-    )
+    headers.append('Authorization', `Bearer ${storage.getItem('accessToken')}`)
   }
 
   try {
@@ -53,7 +50,7 @@ export async function request<T = any>(
       body: JSON.stringify(options.payload),
       mode: 'cors',
       cache: 'no-cache',
-      credentials: 'include'
+      credentials: 'include',
     })
 
     const result = await response.json()
@@ -64,7 +61,12 @@ export async function request<T = any>(
     return result
   } catch (error: any) {
     if (error.code) {
-      toast({ title: error.message })
+      toast({
+        title:
+          error.code === 401
+            ? 'Please connect your wallet first'
+            : error.message,
+      })
     }
     throw error
   }

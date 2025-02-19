@@ -67,7 +67,7 @@ export async function getConnector(mount: string) {
     const descriptor = Object.getOwnPropertyDescriptor(window, mount)
     if (descriptor) {
       const connector = descriptor.value.solana ?? descriptor.value
-      if (mount === 'nightly') {
+      if (mount === 'nightly' && !connector.initialized) {
         const originalSignMessage = connector.signMessage.bind(connector)
         connector.signMessage = async (message: Uint8Array) => {
           return {
@@ -76,6 +76,7 @@ export async function getConnector(mount: string) {
             ),
           }
         }
+        connector.initialized = true
         return connector
       }
       return connector

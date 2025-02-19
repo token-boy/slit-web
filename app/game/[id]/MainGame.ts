@@ -3,10 +3,11 @@
  */
 
 import { GameObjects, Scene } from 'phaser'
-import { IS_DEV, SOL_DECIMALS } from '@/lib/constants'
-import { signAndSendTx } from '@/hooks/use-sign-and-sign-tx'
 import { jwtAuthenticator, wsconnect } from '@nats-io/nats-core'
 import { ConsumerMessages, jetstream } from '@nats-io/jetstream'
+
+import { IS_DEV, SOL_DECIMALS } from '@/lib/constants'
+import { signAndSendTx } from '@/hooks/use-sign-and-sign-tx'
 import { getUrl, request } from '@/lib/request'
 import {
   type Seat,
@@ -15,14 +16,15 @@ import {
   type Hands,
   uiAmount,
 } from '@/lib/game'
-import { cardHeight, cardNames, cardSounds } from '../cards'
-import { EventBus } from '../EventBus'
+import { getStorage, isMobileDevice, sleep } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
 
+import { cardHeight, cardNames, cardSounds } from './cards'
+import { EventBus } from './EventBus'
 import Button from './Button'
 import Player from './Player'
-import { isMobileDevice, sleep } from '@/lib/utils'
 import Control from './Control'
+import { getSize } from './utils'
 
 class MainGame extends Scene {
   container: GameObjects.Container
@@ -48,22 +50,16 @@ class MainGame extends Scene {
   playerId?: string
   hands?: Hands
   balance: bigint = BigInt(0)
+  mute: boolean = false
 
   constructor() {
     super('MainGame')
     this.boardId = location.pathname.split('/')[2]
+    this.mute = getStorage().getItem('mute') === '1'
   }
 
   size() {
-    const size = {
-      width: this.sys.game.config.width as number,
-      height: this.sys.game.config.height as number,
-      scale: (this.sys.game.config.width as number) / 3840,
-    }
-    if (isMobileDevice()) {
-      ;[size.width, size.height] = [size.height, size.width]
-    }
-    return size
+    return getSize(this)
   }
 
   /**
@@ -116,6 +112,32 @@ class MainGame extends Scene {
       this.seatKey = seatKey
       this.playerId = seat.playerId
       this.syncMySeat(seat)
+
+      const { width, height } = this.size()
+
+      // Stake
+      new Control({
+        container: this.container,
+        x: width - 150,
+        y: height - 100,
+        icon: 'stake',
+        tips: 'Stake',
+        onClick: () => {
+          EventBus.emit('open-stake-input')
+        },
+      })
+
+      // Exit
+      new Control({
+        container: this.container,
+        x: width - 60,
+        y: height - 100,
+        icon: 'exit',
+        tips: 'Exit',
+        onClick: () => {
+          EventBus.emit('open-exit-confirm')
+        },
+      })
     } else {
       this.playButton.setVisible(true)
     }
@@ -145,15 +167,15 @@ class MainGame extends Scene {
     } else if (len === 2) {
       return [width - gap, height / 2, gap, height / 2]
     } else if (len === 3) {
-      return [width - gap, height / 2, width / 2, gap, gap, height / 2]
+      return [width - gap, height / 2, width / 2, gap / 2, gap, height / 2]
     } else if (len === 4) {
       return [
         width - gap,
         height / 2,
         width - width / 3,
-        gap,
+        gap / 2,
         width / 3,
-        gap,
+        gap / 2,
         gap,
         height / 2,
       ]
@@ -162,11 +184,11 @@ class MainGame extends Scene {
         width - gap,
         height / 2,
         width - width / 4,
-        gap,
+        gap / 2,
         width / 2,
-        gap,
+        gap / 2,
         width / 4,
-        gap,
+        gap / 2,
         gap,
         height / 2,
       ]
@@ -174,73 +196,96 @@ class MainGame extends Scene {
       return [
         width - gap,
         height / 2,
-        width - width / 6,
-        height / 4,
         width - width / 3,
-        gap,
+        gap / 2,
         width / 3,
-        gap,
-        width / 6,
-        height / 4,
+        gap / 2,
         gap,
         height / 2,
+        width / 4,
+        height - height / 4,
+        width - width / 4,
+        height - height / 4,
       ]
     } else if (len === 7) {
       return [
         width - gap,
         height / 2,
-        width - width / 8,
-        height / 4,
         width - width / 4,
-        gap,
+        gap / 2,
         width / 2,
-        gap,
+        gap / 2,
         width / 4,
-        gap,
-        width / 8,
-        height / 4,
+        gap / 2,
         gap,
         height / 2,
+        width / 4,
+        height - height / 4,
+        width - width / 4,
+        height - height / 4,
       ]
     } else if (len === 8) {
       return [
         width - gap,
         height / 2,
-        width - width / 8,
+        width - width / 6,
         height / 4,
-        width - width / 5,
-        gap,
-        width - width / 2.5,
-        gap,
-        width / 2.5,
-        gap,
-        width / 5,
-        gap,
-        width / 8,
+        width - width / 3,
+        gap / 2,
+        width / 3,
+        gap / 2,
+        width / 6,
         height / 4,
         gap,
         height / 2,
+        width / 4,
+        height - height / 4,
+        width - width / 4,
+        height - height / 4,
       ]
     } else if (len === 9) {
       return [
         width - gap,
         height / 2,
-        width - width / 8,
+        width - width / 6,
         height / 4,
-        width - width / 5,
-        gap,
         width - width / 3,
-        gap,
+        gap / 2,
         width / 2,
-        gap,
+        gap / 2,
         width / 3,
-        gap,
-        width / 5,
-        gap,
-        width / 8,
+        gap / 2,
+        width / 6,
         height / 4,
         gap,
         height / 2,
+        width / 4,
+        height - height / 4,
+        width - width / 4,
+        height - height / 4,
+      ]
+    } else if (len === 10) {
+      return [
+        width - gap,
+        height / 2,
+        width - width / 6,
+        height / 4,
+        width - width / 3,
+        gap / 2,
+        width / 2,
+        gap / 2,
+        width / 3,
+        gap / 2,
+        width / 6,
+        height / 4,
+        gap,
+        height / 2,
+        width / 4,
+        height - height / 4,
+        width / 2,
+        height - gap,
+        width - width / 4,
+        height - height / 4,
       ]
     }
 
@@ -258,6 +303,9 @@ class MainGame extends Scene {
    *                to the game scene.
    */
   private insertPlayers(seats: Seat[], myIndex: number) {
+    if (this.players.length) {
+      return
+    }
     const len = seats.length
     const positions = this.calcPlayerPositions(this.players.length + len)
     if (myIndex !== -1) {
@@ -286,6 +334,20 @@ class MainGame extends Scene {
     }
   }
 
+  /**
+   * Synchronizes the current player's seat information.
+   *
+   * If the player instance does not exist, it creates a new `Player` and sets its
+   * position and properties based on the provided `seat` data. If the player
+   * instance already exists, it updates the player's state with the new seat data,
+   * excluding the hands.
+   *
+   * Retrieves the current hands for the player from the server if available,
+   * sorts them, and updates the player's hand display.
+   *
+   * @param seat - The `Seat` object containing the player's seat information,
+   *               including player ID, chips, and hands.
+   */
   private async syncMySeat(seat: Seat) {
     const { width, height } = this.size()
 
@@ -450,6 +512,14 @@ class MainGame extends Scene {
     this.pot = BigInt(pot)
   }
 
+  /**
+   * Clears the countdown display and associated timer.
+   *
+   * Destroys the countdown icon and text if they exist, and sets the
+   * countdown icon and text properties to undefined. Additionally, it
+   * destroys the countdown timer if it exists and sets the timer property
+   * to undefined, effectively stopping any active countdown.
+   */
   private clearCountdown() {
     if (this.countdownIcon && this.countdownText) {
       this.countdownIcon.destroy()
@@ -461,6 +531,23 @@ class MainGame extends Scene {
     }
   }
 
+  /**
+   * Creates and displays the betting buttons for the player.
+   *
+   * If the player is currently in their turn, and the hands have not been
+   * received after 5 seconds, the function will exit without displaying the
+   * buttons.
+   *
+   * The buttons are displayed horizontally, with the option to bet 1 chip, 2
+   * chips, 3 chips, a custom amount, or to fold. The custom amount button
+   * will open up the custom bet input modal.
+   *
+   * If the player has enough balance to go all in, an "All In" button will
+   * also be displayed.
+   *
+   * The buttons are centered horizontally on the screen, at a y-coordinate of
+   * 300px from the top of the screen.
+   */
   private async createBetButtons() {
     const { width, height } = this.size()
 
@@ -517,11 +604,28 @@ class MainGame extends Scene {
     }
   }
 
+  /**
+   * Destroys all the bet buttons and clears the array.
+   *
+   * Called whenever the game state changes, such as when the player's turn ends,
+   * or when a new round starts.
+   */
   private removeBetButtons() {
     this.betButtonGroup.forEach((b) => b.destroy())
     this.betButtonGroup = []
   }
 
+  /**
+   * Initializes a countdown timer that displays on the screen.
+   *
+   * @param expireAt - The timestamp when the countdown should end.
+   *
+   * The method creates a countdown icon and text to display the remaining
+   * time in seconds until the specified `expireAt` timestamp. If a countdown
+   * is already active, the method exits early. Once initialized, the countdown
+   * updates every second. When the countdown reaches zero, it triggers the
+   * `clearCountdown` method to remove the countdown display.
+   */
   private setCountdown(expireAt: number) {
     const { width, height } = this.size()
 
@@ -609,13 +713,15 @@ class MainGame extends Scene {
     for (const player of this.players) {
       if (player.id === playerId) {
         player.setBet(bet, hands)
-        const sounds = this.sounds
-        if (BigInt(bet) === 0n) {
-          sounds.play(['不要', '过'].at(Math.floor(Math.random() * 2)))
-        } else {
-          sounds.play(
-            ['这牌不错', '碰碰运气'].at(Math.floor(Math.random() * 2))
-          )
+        if (!this.mute) {
+          const sounds = this.sounds
+          if (BigInt(bet) === 0n) {
+            sounds.play(['不要', '过'].at(Math.floor(Math.random() * 2)))
+          } else {
+            sounds.play(
+              ['这牌不错', '碰碰运气'].at(Math.floor(Math.random() * 2))
+            )
+          }
         }
       } else {
         player.clearBet()
@@ -637,9 +743,11 @@ class MainGame extends Scene {
       return
     }
     targetCard.setTexture(cardNames[card])
-    setTimeout(() => {
-      this.sounds.play(cardSounds.chinese[card], { delay: 1.5 })
-    })
+    if (!this.mute) {
+      setTimeout(() => {
+        this.sounds.play(cardSounds.chinese[card], { delay: 1.5 })
+      })
+    }
   }
 
   /**
@@ -665,6 +773,14 @@ class MainGame extends Scene {
     }
   }
 
+  /**
+   * Places a bet by sending a request to the server with the specified amount of chips.
+   *
+   * If the player does not have enough chips, displays a toast message and exits early.
+   * Removes the bet buttons before sending the request and restores them if the request fails.
+   *
+   * @param chips - The amount of chips to bet.
+   */
   private async bet(chips: bigint) {
     if (!this.myPlayer || chips > this.balance) {
       toast({ title: 'Chips not enough' })
@@ -769,8 +885,26 @@ class MainGame extends Scene {
     await signAndSendTx(tx)
   }
 
+  /**
+   * The create method is called after the scene has been initialized.
+   * It is used to create all the game objects and add them to the scene.
+   * It is also used to set up the game's audio and input.
+   *
+   * It creates a container for the game and adds the game's background,
+   * my hands, play button, and back control to it.
+   * It also sets up the game's audio and input.
+   *
+   * It emits the 'open-stake-input' event when the play button is clicked.
+   * It emits the 'bet-input-submited' event when the bet input is submitted.
+   * It emits the 'stake-input-submited' event when the stake input is submitted.
+   * It emits the 'exit-confirmed' event when the exit button is clicked.
+   *
+   * It is also used to set up the game's start animation.
+   */
   create() {
-    const { width, height } = this.size()
+    const { width, height, scale } = this.size()
+    this.data.set('width', width)
+    this.data.set('height', height)
 
     const container = this.make
       .container({})
@@ -790,14 +924,16 @@ class MainGame extends Scene {
     container.add(background)
 
     // Game audio
-    // this.backgroundMusic = this.sound.add('background-music', {
-    //   loop: true,
-    //   volume: 1,
-    // }) as Phaser.Sound.WebAudioSound
-    // this.backgroundMusic.play()
+    this.backgroundMusic = this.sound.add('background-music', {
+      loop: true,
+      volume: 1,
+    }) as Phaser.Sound.WebAudioSound
     this.sounds = this.sound.addAudioSprite(
       'sounds-chinese'
     ) as Phaser.Sound.WebAudioSound
+    if (!this.mute) {
+      this.backgroundMusic.play()
+    }
 
     // Create my hands
     const hand0 = this.make
@@ -816,48 +952,121 @@ class MainGame extends Scene {
       .setVisible(false)
     this.myHands.push(hand0, hand1)
     this.container.add([hand0, hand1])
-    EventBus.on('bet-input-submited', this.bet.bind(this))
 
     // Play Button
     this.playButton = new Button({
       container,
       x: width / 2,
-      y: height - 100,
+      y: height - 360,
       width: 150,
       height: 75,
       label: 'Play',
       colors: ['#ad7111', '#d18c26', '#f7a73a'],
       onClick: () => {
+        const accessToken = getStorage().getItem('accessToken')
+        if (
+          !accessToken ||
+          JSON.parse(atob(accessToken.split('.')[1])).exp < Date.now()
+        ) {
+          EventBus.emit('open-wallet-connector')
+          return
+        }
         EventBus.emit('open-stake-input')
       },
     })
     this.playButton.setVisible(false)
 
-    // Stake
+    // Back
     new Control({
+      container,
+      x: 50,
+      y: 50,
+      icon: 'back',
+      onClick: () => {
+        window.location.href = '/play'
+      },
+    })
+
+    // Mute
+    const muteControl = new Control({
       container,
       x: width - 100,
-      y: height - 100,
-      icon: 'stake',
-      tips: 'Stake',
+      y: 100,
+      icon: this.mute ? 'mute' : 'unmute',
       onClick: () => {
-        EventBus.emit('open-stake-input')
+        if (this.mute) {
+          this.backgroundMusic.play()
+          muteControl.setIcon('unmute')
+          getStorage().setItem('mute', '0')
+        } else {
+          this.backgroundMusic.pause()
+          muteControl.setIcon('mute')
+          getStorage().setItem('mute', '1')
+        }
+        this.mute = !this.mute
       },
     })
-    EventBus.on('stake-input-submited', this.stake.bind(this))
 
-    // Exit
-    new Control({
-      container,
-      x: width - 50,
-      y: height - 100,
-      icon: 'exit',
-      tips: 'Exit',
-      onClick: () => {
-        EventBus.emit('open-exit-confirm')
+    EventBus.on('bet-input-submited', this.bet.bind(this))
+    EventBus.on('stake-input-submited', this.stake.bind(this))
+    EventBus.on('exit-confirmed', this.redeem.bind(this))
+
+    // Start
+    const startTexture = this.textures.get('start')
+    const startImage = startTexture.getSourceImage()
+    startTexture.add('left', 0, 0, 0, startImage.width / 2, startImage.height)
+    startTexture.add(
+      'right',
+      0,
+      startImage.width / 2,
+      0,
+      startImage.width / 2,
+      startImage.height
+    )
+    const startLeft = this.make
+      .sprite({
+        x: width / 4,
+        y: height / 2,
+        key: 'start',
+        frame: 'left',
+      })
+      .setScale(scale)
+    const startRight = this.make
+      .sprite({
+        x: width - width / 4,
+        y: height / 2,
+        key: 'start',
+        frame: 'right',
+      })
+      .setScale(scale)
+    container.add([startLeft, startRight])
+    this.tweens.add({
+      targets: startLeft,
+      x: width / 2 - (startLeft.width * scale) / 2,
+      duration: 500,
+      ease: Phaser.Math.Easing.Quadratic.Out,
+      onComplete: () => {
+        if (!this.mute) {
+          this.sound.add('start', { volume: 1 }).play()
+        }
+        setTimeout(() => {
+          container.remove(startLeft)
+          startLeft.destroy()
+        }, 1000)
       },
     })
-    EventBus.on('exit-confirmed', this.redeem.bind(this))
+    this.tweens.add({
+      targets: startRight,
+      x: width / 2 + (startRight.width * scale) / 2,
+      duration: 500,
+      ease: Phaser.Math.Easing.Quadratic.Out,
+      onComplete: () => {
+        setTimeout(() => {
+          container.remove(startRight)
+          startRight.destroy()
+        }, 1000)
+      },
+    })
 
     this.enter()
   }

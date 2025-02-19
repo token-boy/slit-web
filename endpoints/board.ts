@@ -3,6 +3,8 @@ export interface Board {
   address: string
   chips: number
   limit: number
+  players: number
+  createdAt: number
 }
 
 export interface BoardEndpoints {
@@ -11,8 +13,13 @@ export interface BoardEndpoints {
       payload: {}
       params: {
         page: number
+        minPlayers: string
+        limit: string
       }
-      data: Board[]
+      data: {
+        boards: Board[],
+        total: number
+      }
     },
     POST: {
       payload: {

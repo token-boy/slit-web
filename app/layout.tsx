@@ -50,7 +50,7 @@ export default function RootLayout({
       <body>
         <AccountProvider>{children}</AccountProvider>
         <Toaster />
-        <DevTools />
+        {/* <DevTools /> */}
       </body>
     </html>
   )
