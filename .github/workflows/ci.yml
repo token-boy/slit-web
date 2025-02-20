@@ -35,6 +35,12 @@ jobs:
         uses: docker/build-push-action@v6.10.0
         with:
           context: .
+          build-args: |
+            NEXT_PUBLIC_API=${{ secrets.NEXT_PUBLIC_API }}
+            NEXT_PUBLIC_NATS_SERVER=${{ secrets.NEXT_PUBLIC_NATS_SERVER }}
+            NEXT_PUBLIC_NATS_JWT_TOKEN=${{ secrets.NEXT_PUBLIC_NATS_JWT_TOKEN }}
+            NEXT_PUBLIC_NATS_NKEY=${{ secrets.NEXT_PUBLIC_NATS_NKEY }}
+            NEXT_PUBLIC_SOLANA_EXPLORER=${{ secrets.NEXT_PUBLIC_SOLANA_EXPLORER }}
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -51,11 +57,6 @@ jobs:
             docker pull ${{ env.IMAGE }}
             docker run --detach \
               --name=${{ env.PROJECT_NAME }}-${{ github.sha }} \
-              --env=NEXT_PUBLIC_API=${{ secrets.NEXT_PUBLIC_API }} \
-              --env=NEXT_PUBLIC_NATS_SERVER=${{ secrets.NEXT_PUBLIC_NATS_SERVER }} \
-              --env=NEXT_PUBLIC_NATS_JWT_TOKEN=${{ secrets.NEXT_PUBLIC_NATS_JWT_TOKEN }} \
-              --env=NEXT_PUBLIC_NATS_NKEY=${{ secrets.NEXT_PUBLIC_NATS_NKEY }} \
-              --env=NEXT_PUBLIC_SOLANA_EXPLORER=${{ secrets.NEXT_PUBLIC_SOLANA_EXPLORER }} \
               --network=main \
               --label=traefik.enable=true \
               --label=traefik.http.routers.${{ env.PROJECT_NAME }}.rule=Host\(\`slit.mxsyx.site\`\) \
