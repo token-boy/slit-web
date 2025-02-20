@@ -41,21 +41,21 @@ class Preloader extends Scene {
 
   async preload() {
     this.load.setPath(CDN_URL)
-    this.load.image('my-chips', 'my-chips.webp?v=2')
-    this.load.image('countdown', 'countdown.webp?v=2')
-    this.load.image('my-bet', 'my-bet.webp?v=2')
-    this.load.image('pot', 'pot.webp?v=2')
-    this.load.image('stake', 'stake.png?v=3')
-    this.load.image('exit', 'exit.png?v=3')
-    this.load.image('back', 'back.png?v=3')
-    this.load.image('mute', 'mute.png?v=3')
-    this.load.image('unmute', 'unmute.png?v=3')
-    this.load.image('start', 'start.webp?v=3')
-    this.load.audio('background-music', 'background.mp3?v=2')
-    this.load.audioSprite('sounds-chinese', 'sounds-chinese.json?v=2', [
-      'sounds-chinese.mp3?v=2',
+    this.load.image('my-chips', 'my-chips.webp?v=10')
+    this.load.image('countdown', 'countdown.webp?v=10')
+    this.load.image('my-bet', 'my-bet.webp?v=10')
+    this.load.image('pot', 'pot.webp?v=10')
+    this.load.image('stake', 'stake.png?v=10')
+    this.load.image('exit', 'exit.png?v=10')
+    this.load.image('back', 'back.png?v=10')
+    this.load.image('mute', 'mute.png?v=10')
+    this.load.image('unmute', 'unmute.png?v=10')
+    this.load.image('start', 'start.webp?v=10')
+    this.load.audio('background-music', 'background.mp3?v=10')
+    this.load.audioSprite('sounds-chinese', 'sounds-chinese.json?v=10', [
+      'sounds-chinese.mp3?v=10',
     ])
-    this.load.audio('start', 'start.mp3?v=2')
+    this.load.audio('start', 'start.mp3?v=10')
 
     await Promise.all(
       Object.entries(cards).map(([name, data]) => {
