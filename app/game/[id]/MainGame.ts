@@ -794,7 +794,7 @@ class MainGame extends Scene {
         seatKey: this.seatKey,
         bet: chips.toString(),
       },
-    }).catch((e) => {
+    }).catch(() => {
       this.createBetButtons()
     })
   }

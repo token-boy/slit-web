@@ -4,9 +4,10 @@ import { useRef, useState } from 'react'
 import { CloudUpload, LoaderIcon } from 'lucide-react'
 import Image from 'next/image'
 
-import { encode } from '@/lib/webp'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/hooks/use-toast'
+import Script from 'next/script'
+import { CDN_URL } from '@/lib/constants'
 
 const MAX_SIZE = 365 * 1024
 
@@ -43,7 +44,7 @@ const Upload: React.FC<{
         ctx.drawImage(img, 0, 0)
         const rawImageData = ctx.getImageData(0, 0, img.width, img.height)
 
-        const webpBuffer = await encode(rawImageData)
+        const webpBuffer = await window.encodeWebp(rawImageData)
         if (webpBuffer.byteLength > MAX_SIZE) {
           toast({ title: 'The compressed size of the image exceed 365kb' })
           return
@@ -64,6 +65,7 @@ const Upload: React.FC<{
 
   return (
     <div className="inline-flex items-center gap-6">
+      <Script src={`${CDN_URL}/webpp/index.js`}></Script>
       <input
         type="file"
         ref={ref}
