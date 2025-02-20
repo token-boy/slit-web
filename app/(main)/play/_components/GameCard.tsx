@@ -20,27 +20,24 @@ const GameCard: React.FC<{ board: Board }> = ({ board }) => {
           <CardHeader>
             <CardTitle>Game #{board.id}</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex items-center">
-                <Users className="mr-2" size={16} />
-                <span>{board.players} Players</span>
-              </div>
-              <div className="flex items-center">
-                <Clock className="mr-2" size={16} />
-                <span>
-                  {Math.floor((Date.now() - board.createdAt) / 1000 / 60)}{' '}
-                  Minutes
-                </span>
-              </div>
-              <div className="flex items-center">
-                <Coins className="mr-2" size={16} />
-                <span>{uiAmount(BigInt(board.limit))} Limit</span>
-              </div>
-              <div className="flex items-center">
-                <Database className="mr-2" size={16} />
-                <span>{uiAmount(BigInt(board.chips))} Chips pool</span>
-              </div>
+          <CardContent className="grid grid-cols-2 gap-2">
+            <div className="flex items-center">
+              <Users className="mr-2" size={16} />
+              <span>{board.players} Players</span>
+            </div>
+            <div className="flex items-center">
+              <Clock className="mr-2" size={16} />
+              <span>
+                {Math.floor((Date.now() - board.createdAt) / 1000 / 60)} Minutes
+              </span>
+            </div>
+            <div className="flex items-center">
+              <Coins className="mr-2" size={16} />
+              <span>{uiAmount(BigInt(board.limit))} Limit</span>
+            </div>
+            <div className="flex items-center">
+              <Database className="mr-2" size={16} />
+              <span>{uiAmount(BigInt(board.chips))} Chips pool</span>
             </div>
           </CardContent>
         </Card>

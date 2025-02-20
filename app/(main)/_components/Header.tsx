@@ -1,9 +1,10 @@
 'use client'
 
-import WalletConnector from '@/components/WalletConnector'
 import Link from 'next/link'
 
-const Header = () => {
+import WalletConnector from '@/components/WalletConnector'
+
+const Header: React.FC = () => {
   return (
     <header className="bg-gray-800 py-4">
       <div className="container mx-auto px-4 flex justify-between items-center">
@@ -17,12 +18,12 @@ const Header = () => {
           >
             Play
           </Link>
-          <a
-            href="#community"
+          <Link
+            href="/guides"
             className="text-gray-300 hover:text-yellow-400 transition-colors"
           >
             Guides
-          </a>
+          </Link>
           <WalletConnector />
         </nav>
       </div>

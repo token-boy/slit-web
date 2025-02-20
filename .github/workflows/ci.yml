@@ -1,0 +1,65 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}
+  PROJECT_NAME: slit-web
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Github Packages
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker Setup Buildx
+        uses: docker/setup-buildx-action@v3.8.0
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6.10.0
+        with:
+          context: .
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: ${{ env.IMAGE }}
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            docker login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
+            docker pull ${{ env.IMAGE }}
+            docker run --detach \
+              --name=${{ env.PROJECT_NAME }}-${{ github.sha }} \
+              --env=NEXT_PUBLIC_API=${{ secrets.NEXT_PUBLIC_API }} \
+              --env=NEXT_PUBLIC_NATS_SERVER=${{ secrets.NEXT_PUBLIC_NATS_SERVER }} \
+              --env=NEXT_PUBLIC_NATS_JWT_TOKEN=${{ secrets.NEXT_PUBLIC_NATS_JWT_TOKEN }} \
+              --env=NEXT_PUBLIC_NATS_NKEY=${{ secrets.NEXT_PUBLIC_NATS_NKEY }} \
+              --env=NEXT_PUBLIC_SOLANA_EXPLORER=${{ secrets.NEXT_PUBLIC_SOLANA_EXPLORER }} \
+              --network=main \
+              --label=traefik.enable=true \
+              --label=traefik.http.routers.${{ env.PROJECT_NAME }}.rule=Host\(\`slit.mxsyx.site\`\) \
+              --label=traefik.http.routers.${{ env.PROJECT_NAME }}.tls.certResolver=letsencrypt \
+              --label=traefik.http.routers.${{ env.PROJECT_NAME }}.service=${{ env.PROJECT_NAME }} \
+              --label=traefik.http.services.${{ env.PROJECT_NAME }}.loadbalancer.server.port=3000 \
+              ${{ env.IMAGE }}

@@ -30,11 +30,13 @@ import { useBoolean } from 'ahooks'
 import useSignAndSendTx from '@/hooks/use-sign-and-sign-tx'
 import { getStorage, isMobileDevice } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
-import { CreditCard, LogOut, User } from 'lucide-react'
+import { Coins, CreditCard, LogOut, User } from 'lucide-react'
+import Link from 'next/link'
+import { uiAmount } from '@/lib/game'
 
 const WalletConnector: React.FC<{
   children?: React.ReactNode
-  ref?: React.RefObject<HTMLDivElement|null>
+  ref?: React.RefObject<HTMLDivElement | null>
 }> = (props) => {
   const [wallets, setWallets] = useState<
     (WalletProvider & { isInstalled: boolean })[]
@@ -126,6 +128,19 @@ const WalletConnector: React.FC<{
     setAccount(undefined)
   }
 
+  useEndpoint('v1/chips', {
+    method: 'GET',
+    ready: account !== undefined,
+    manual: false,
+    onSuccess(data) {
+      if (!account) {
+        return
+      }
+      account.balance = data.amount
+      setAccount({ ...account })
+    },
+  })
+
   return account ? (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -142,16 +157,28 @@ const WalletConnector: React.FC<{
       <DropdownMenuContent>
         <DropdownMenuLabel>My Account</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
-          <User />
-          <span>Profile</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <CreditCard />
-          <span>Billing</span>
-        </DropdownMenuItem>
+        <Link href="/profile">
+          <DropdownMenuItem className="cursor-pointer">
+            <User />
+            <span>Profile</span>
+          </DropdownMenuItem>
+        </Link>
+        <Link href="/billing">
+          <DropdownMenuItem className="cursor-pointer">
+            <CreditCard />
+            <span>Billing</span>
+          </DropdownMenuItem>
+        </Link>
+        {account?.balance && (
+          <Link href="/balance">
+            <DropdownMenuItem className="cursor-pointer">
+              <Coins />
+              <span>{uiAmount(account.balance)}</span>
+            </DropdownMenuItem>
+          </Link>
+        )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={disconnect}>
+        <DropdownMenuItem onClick={disconnect} className="cursor-pointer">
           <LogOut />
           <span>Log out</span>
         </DropdownMenuItem>

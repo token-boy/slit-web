@@ -23,6 +23,7 @@ import { useBoolean } from 'ahooks'
 import { toast } from '@/hooks/use-toast'
 import { Controller, useForm } from 'react-hook-form'
 import { Label } from '@/components/ui/label'
+import { Skeleton } from '@/components/ui/skeleton'
 
 const PlayPage: NextPage = () => {
   const [chipsInputOpen, setChipsInputOpen] = useBoolean(false)
@@ -163,6 +164,13 @@ const PlayPage: NextPage = () => {
 
       <div>
         <div className="flex flex-wrap items-center gap-4 mb-8">
+          {loading &&
+            Array(10)
+              .fill(0)
+              .map((_, i) => (
+                <Skeleton key={i} className="h-[125px] w-[20vw] rounded-xl" />
+              ))}
+
           {boards.map((board) => (
             <GameCard key={board.id} board={board} />
           ))}

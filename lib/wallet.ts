@@ -6,6 +6,7 @@ import { CDN_URL, IS_DEV } from './constants'
 
 export interface Account {
   address: string
+  balance?: string
   provider: {
     name: string
     logo: string

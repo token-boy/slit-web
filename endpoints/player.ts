@@ -9,4 +9,22 @@ export interface PlayerEndpoints {
       }
     }
   }
+  'v1/players/profile': {
+    GET: {
+      payload: {}
+      params: {}
+      data: {
+        avatarUrl: string
+        nickname: string
+      }
+    },
+    PUT: {
+      payload: {
+        avatarUrl: string
+        nickname: string
+      }
+      params: {}
+      data: {}
+    }
+  }
 }

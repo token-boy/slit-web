@@ -9,5 +9,21 @@ export interface ChipsEnpoints {
         tx: string
       }
     }
+    DELETE: {
+      payload: {
+        amount: string
+      }
+      params: {}
+      data: {
+        tx: string
+      }
+    }
+    GET: {
+      payload: {}
+      params: {}
+      data: {
+        amount: string
+      }
+    }
   }
 }
