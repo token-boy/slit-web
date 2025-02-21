@@ -163,7 +163,7 @@ class MainGame extends Scene {
     const gap = 200
 
     if (len === 1) {
-      return [width / 2, gap]
+      return [width / 2, gap / 2]
     } else if (len === 2) {
       return [width - gap, height / 2, gap, height / 2]
     } else if (len === 3) {

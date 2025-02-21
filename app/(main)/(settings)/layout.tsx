@@ -13,7 +13,7 @@ export default function Layout({
 
   return (
     <div className="flex flex-col lg:flex-row justify-center mt-4 lg:mt-8">
-      <div className="flex lg:flex-col gap-1 max-lg:border-b lg:border-r px-4 py-2">
+      <div className="flex lg:flex-col gap-2 lg:gap-1 max-lg:border-b lg:border-r px-4 py-2">
         <Link
           href="/profile"
           className={clsx('hover:underline', {
