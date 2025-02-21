@@ -9,7 +9,7 @@ import Link from 'next/link'
 
 const GameCard: React.FC<{ board: Board }> = ({ board }) => {
   return (
-    <Link href={`/game/${board.id}`}>
+    <Link href={`/game/${board.id}`} className="grow">
       <motion.div
         initial={{ scale: 1 }}
         transition={{ duration: 0.5 }}

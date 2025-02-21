@@ -113,16 +113,15 @@ const BillingPage: NextPage = () => {
 
       <div>
         <div className="flex flex-col gap-1">
-        {loading &&
-            Array(10)
-              .fill(0)
-              .map((_, i) => (
-                <Skeleton key={i} className="h-[125px] w-full rounded-xl" />
+          {loading
+            ? Array(10)
+                .fill(0)
+                .map((_, i) => (
+                  <Skeleton key={i} className="h-[125px] w-full rounded-xl" />
+                ))
+            : bills.map((bill) => (
+                <BillCard key={bill._id} bill={bill} onConfirm={refresh} />
               ))}
-
-          {bills.map((bill) => (
-            <BillCard key={bill._id} bill={bill} onConfirm={refresh} />
-          ))}
         </div>
 
         {/* Pagination */}
