@@ -58,9 +58,5 @@ jobs:
             docker run --detach \
               --name=${{ env.PROJECT_NAME }}-${{ github.sha }} \
               --network=main \
-              --label=traefik.enable=true \
-              --label=traefik.http.routers.${{ env.PROJECT_NAME }}.rule=Host\(\`slit.mxsyx.site\`\) \
-              --label=traefik.http.routers.${{ env.PROJECT_NAME }}.tls.certResolver=letsencrypt \
-              --label=traefik.http.routers.${{ env.PROJECT_NAME }}.service=${{ env.PROJECT_NAME }} \
-              --label=traefik.http.services.${{ env.PROJECT_NAME }}.loadbalancer.server.port=3000 \
               ${{ env.IMAGE }}
+            curl -if "http://localhost:10234/join?service=${{ env.PROJECT_NAME }}&port=3000&host=slit.mxsyx.site&updateDelay=60&stopTimeout=90"

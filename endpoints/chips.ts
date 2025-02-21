@@ -10,10 +10,10 @@ export interface ChipsEnpoints {
       }
     }
     DELETE: {
-      payload: {
+      payload: {}
+      params: {
         amount: string
       }
-      params: {}
       data: {
         tx: string
       }

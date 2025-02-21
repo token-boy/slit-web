@@ -483,7 +483,7 @@ class MainGame extends Scene {
    *
    * @param pot - The current pot value as a string, used to update the display.
    */
-  private syncPot(pot: string) {
+  private syncPot(pot?: string) {
     const iconSize = 150
 
     if (!this.potText) {
@@ -506,10 +506,10 @@ class MainGame extends Scene {
       })
       this.container.add([this.potIcon, this.potText])
     } else {
-      this.potText.setText((BigInt(pot) / SOL_DECIMALS).toString())
+      this.potText.setText((BigInt(pot ?? '0') / SOL_DECIMALS).toString())
     }
 
-    this.pot = BigInt(pot)
+    this.pot = BigInt(pot ?? '0')
   }
 
   /**

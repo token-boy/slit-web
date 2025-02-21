@@ -1,34 +1,20 @@
 'use client'
 
+import { useState } from 'react'
 import { NextPage } from 'next'
 
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import useSignAndSendTx from '@/hooks/use-sign-and-sign-tx'
-import { CHIPS_RATE, SOL_DECIMALS } from '@/lib/constants'
+import { Input } from '@/components/ui/input'
+import { Controller, useForm } from 'react-hook-form'
+import { Label } from '@/components/ui/label'
+import { Skeleton } from '@/components/ui/skeleton'
+import { SOL_DECIMALS } from '@/lib/constants'
 import { useEndpoint } from '@/lib/request'
 
 import CreateGameButton from './_components/CreateGameButton'
 import GameCard from './_components/GameCard'
-import { useRef, useState } from 'react'
-import { Input } from '@/components/ui/input'
-import { useBoolean } from 'ahooks'
-import { toast } from '@/hooks/use-toast'
-import { Controller, useForm } from 'react-hook-form'
-import { Label } from '@/components/ui/label'
-import { Skeleton } from '@/components/ui/skeleton'
 
 const PlayPage: NextPage = () => {
-  const [chipsInputOpen, setChipsInputOpen] = useBoolean(false)
-  const chipsInput = useRef<HTMLInputElement>(null)
-
   const {
     control,
     formState: { errors },
@@ -39,15 +25,6 @@ const PlayPage: NextPage = () => {
       limit: '',
     },
   })
-
-  const { loading: tradeLoading, signAndSendTx } = useSignAndSendTx()
-
-  const { loading: depositLoading, runAsync: deposit } = useEndpoint(
-    'v1/chips',
-    {
-      method: 'POST',
-    }
-  )
 
   const [filterParams, setFilterParams] = useState({
     minPlayers: '0',
@@ -70,42 +47,7 @@ const PlayPage: NextPage = () => {
     <div className="px-5 py-8">
       <div className="flex-between mb-8">
         <h1 className="text-3xl font-bold">Game Hall</h1>
-        <div className="flex items-center">
-          <Dialog open={chipsInputOpen} onOpenChange={setChipsInputOpen.toggle}>
-            <DialogTrigger asChild>
-              <Button className="mr-4">Deposit</Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Input sols</DialogTitle>
-              </DialogHeader>
-              <p>1 SOL = {CHIPS_RATE} Chips</p>
-              <Input ref={chipsInput} placeholder="min 0.001 sol" />
-              <DialogFooter>
-                <Button
-                  loading={depositLoading || tradeLoading}
-                  onClick={async () => {
-                    const value = parseFloat(chipsInput.current!.value)
-                    if (isNaN(value) || value < 0.001) {
-                      toast({ title: 'Incorrect input' })
-                      return
-                    }
-                    const { tx } = await deposit({
-                      amount: (
-                        BigInt(value * CHIPS_RATE) * SOL_DECIMALS
-                      ).toString(),
-                    })
-                    await signAndSendTx(tx)
-                    setChipsInputOpen.setFalse()
-                  }}
-                >
-                  Confirm
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          <CreateGameButton onCreated={refresh} />
-        </div>
+        <CreateGameButton onCreated={refresh} />
       </div>
 
       {/* FilterBar */}

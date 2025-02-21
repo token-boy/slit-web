@@ -57,7 +57,7 @@ const BalancePage: React.FC = () => {
   )
 
   return (
-    <div className='mt-4'>
+    <div className="mt-4">
       {account?.balance && (
         <p className="text-2xl font-semibold">
           {uiAmount(account.balance)} Chips
@@ -120,7 +120,7 @@ const BalancePage: React.FC = () => {
                     toast({ title: 'Incorrect input' })
                     return
                   }
-                  const { tx } = await withdraw({
+                  const { tx } = await withdraw(undefined, {
                     amount: (
                       BigInt(value * CHIPS_RATE) * SOL_DECIMALS
                     ).toString(),
