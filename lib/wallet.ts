@@ -2,7 +2,7 @@
 
 import { VersionedTransaction } from '@solana/web3.js'
 import { isMobileDevice, sleep } from './utils'
-import { CDN_URL, IS_DEV } from './constants'
+import { CDN_URL } from './constants'
 
 export interface Account {
   address: string
