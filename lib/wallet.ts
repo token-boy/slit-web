@@ -39,16 +39,12 @@ const providers = [
     url: 'https://www.okx.com/web3',
     logo: `${CDN_URL}/okxwallet.png`,
   },
-  ...(IS_DEV
-    ? [
-        {
-          name: 'Nightly',
-          mount: 'nightly',
-          url: 'https://nightly.app/',
-          logo: `${CDN_URL}/nightly.png`,
-        },
-      ]
-    : []),
+  {
+    name: 'Nightly',
+    mount: 'nightly',
+    url: 'https://nightly.app/',
+    logo: `${CDN_URL}/nightly.png`,
+  },
 ]
 
 export type WalletProvider = (typeof providers)[0]
